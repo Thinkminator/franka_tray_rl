@@ -1,0 +1,24 @@
+name: franka_trayball_rl
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9  # Or 3.10, 3.11 - choose your preferred version
+  - pip
+  - numpy
+  - scipy
+  - matplotlib
+  - jupyter
+  - ipykernel
+  - pybullet  # For your initial environment setup as mentioned in the proposal
+  - dm_control  # For MuJoCo integration and utilities
+  - mujoco  # The official MuJoCo Python bindings
+  - gymnasium  # Standardized API for RL environments (formerly gym)
+  - stable-baselines3  # For PPO implementation
+  - pytorch  # Or tensorflow, depending on your preference for Stable-Baselines3 backend
+  - tensorboard  # For logging and visualization during RL training
+  - pip:
+    - mujoco-python-viewer # A simple viewer for MuJoCo models
+    - transforms3d # Useful for rigid body transformations
+    - hydra-core # For configuration management (optional but good for RL projects)
+    - omegaconf # Hydra dependency

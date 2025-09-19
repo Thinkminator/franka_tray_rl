@@ -1,0 +1,18 @@
+env:
+  name: TrayPoseEnv
+  model_path: assets/panda_tray/panda_tray.urdf
+  max_steps: 500
+  start_tray: [0.5, 0.3, 0.65]
+  start_yaw: -3.07
+  goal_tray: [0.5, -0.35, 0.2]
+  goal_yaw: -4.57
+  start_ball: [0.5, 0.3, 0.7]
+
+reward:
+  ball_offset_weight: 1.0
+  tray_distance_weight: 1.0
+
+training:
+  seed: 123
+  episodes: 10000
+  gamma: 0.99
