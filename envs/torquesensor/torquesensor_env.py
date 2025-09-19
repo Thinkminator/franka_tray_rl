@@ -6,15 +6,15 @@ from gym import spaces
 
 class TorqueSensorEnv(gym.Env):
     """
-    Custom environment for tray-ball manipulation (torquesensor variant).
-    Observation uses end-effector torque sensor instead of ball position.
+    Custom environment for tray-cylinder manipulation (torquesensor variant).
+    Observation uses end-effector torque sensor instead of cylinder position.
     """
     metadata = {"render.modes": ["human"]}
 
-    def __init__(self, model_path="assets/panda_tray_torque/panda_tray_ball_torque.xml"):
+    def __init__(self, model_path="assets/panda_tray/panda_tray_cylinder_torque.xml"):
         super(TorqueSensorEnv, self).__init__()
 
-        # Load Mujoco model (robot + tray + ball)
+        # Load Mujoco model (robot + tray + cylinder)
         self.model = mujoco.MjModel.from_xml_path(model_path)
         self.data = mujoco.MjData(self.model)
 
@@ -48,10 +48,10 @@ class TorqueSensorEnv(gym.Env):
         for i, q in enumerate(self.start_joints):
             self.data.qpos[i] = q
 
-        # Reset ball position
-        ball_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "ball_free")
-        ball_qposadr = self.model.jnt_qposadr[ball_id]
-        self.data.qpos[ball_qposadr:ball_qposadr+7] = np.array([0.5, 0.3, 0.7, 1, 0, 0, 0])
+        # Reset cylinder position
+        cylinder_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "cylinder_free")
+        cylinder_qposadr = self.model.jnt_qposadr[cylinder_id]
+        self.data.qpos[cylinder_qposadr:cylinder_qposadr+7] = np.array([0.5, 0.3, 0.7, 1, 0, 0, 0])
 
         mujoco.mj_forward(self.model, self.data)
 
@@ -72,7 +72,7 @@ class TorqueSensorEnv(gym.Env):
 
         obs = self._get_obs()
 
-        # Rewards: reach goal tray pose (no direct ball state)
+        # Rewards: reach goal tray pose (no direct cylinder state)
         tray_dist = np.linalg.norm(self.tray_pos - self.goal_tray) + abs(self.tray_yaw - self.goal_yaw)
         reward = -tray_dist
 

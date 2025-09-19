@@ -1,4 +1,4 @@
-name: franka_trayball_rl
+name: franka_tray_rl
 channels:
   - conda-forge
   - defaults

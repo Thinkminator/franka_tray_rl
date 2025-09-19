@@ -18,7 +18,7 @@ from envs.traypose.traypose_env import TrayPoseEnv
 
 def main():
     # Initialize environment
-    env = TrayPoseEnv(model_path="assets/panda_tray/panda_tray_ball.xml")
+    env = TrayPoseEnv(model_path="assets/panda_tray/panda_tray_cylinder.xml")
     # Reset env
     obs = env.reset()
     print("Initial observation:", obs)

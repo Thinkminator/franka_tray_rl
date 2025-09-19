@@ -21,7 +21,7 @@ def main():
     # 1. Make environment
     # ------------------------------
     def make_env():
-        return TorqueSensorEnv(model_path="assets/panda_tray_torque/panda_tray_ball_torque.xml")
+        return TorqueSensorEnv(model_path="assets/panda_tray/panda_tray_cylinder_torque.xml")
 
     # Vectorized environment (parallel workers for faster training)
     env = make_vec_env(make_env, n_envs=4)

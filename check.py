@@ -2,7 +2,7 @@ import mujoco
 import numpy as np
 
 # Load model
-model = mujoco.MjModel.from_xml_path("assets/panda_tray_torque/panda_tray_ball_torque.xml")
+model = mujoco.MjModel.from_xml_path("assets/panda_tray/panda_tray_cylinder_torque.xml")
 data = mujoco.MjData(model)
 
 # Compute forward kinematics

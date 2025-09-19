@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-<mujoco model="panda_tray_ball">
+<mujoco model="panda_tray_cylinder_torque">
   <compiler angle="radian" coordinate="local" meshdir="." texturedir="."/>
   <option timestep="0.002" gravity="0 0 -9.81"/>
   
@@ -65,8 +65,13 @@
                     <!-- End Effector -->
                     <body name="panda_EndEffector" pos="0 0 0.107" quat="0.9238795 0 0 0.3826834">
                       
+                      <!-- Add site here for torque sensor -->
+                      <site name="ee_site" pos="0 0 0" size="0.001" rgba="1 0 0 0"/>
+
                       <!-- Tray attached to end effector -->
                       <body name="tray_base" pos="0 0 0.09" quat="0.7071068 0 0.7071068 0">
+
+                        <site name="tray_site" pos="0 0 0" size="0.001" rgba="0 1 0 1"/>
                         
                         <!-- Tray base -->
                         <geom name="tray_base_geom" type="box" size="0.08 0.12 0.005" material="tray_black"/>
@@ -87,10 +92,10 @@
       </body>
     </body>
 
-    <!-- Ball with freejoint -->
-    <body name="ball" pos="0.5 0.3 0.7">
-      <freejoint name="ball_free"/>
-      <geom name="ball_geom" type="sphere" size="0.02" material="ball_red"/>
+    <!-- Cylinder object -->
+    <body name="cylinder" pos="0.5 0.3 0.68">
+      <freejoint name="cylinder_free"/>
+      <geom name="cylinder_geom" type="cylinder" size="0.02 0.03" material="ball_red"/>
     </body>
 
     <!-- Ground plane -->
@@ -106,4 +111,9 @@
     <motor name="panda_joint6_motor" joint="panda_joint6" gear="12"/>
     <motor name="panda_joint7_motor" joint="panda_joint7" gear="12"/>
   </actuator>
+
+  <sensor>
+    <torque name="ee_torque" site="ee_site"/>
+  </sensor>
+
 </mujoco>

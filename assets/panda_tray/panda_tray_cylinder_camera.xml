@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-<mujoco model="panda_tray_ball_torque">
+<mujoco model="panda_tray_cylinder_torque">
   <compiler angle="radian" coordinate="local" meshdir="." texturedir="."/>
   <option timestep="0.002" gravity="0 0 -9.81"/>
   
@@ -92,10 +92,10 @@
       </body>
     </body>
 
-    <!-- Ball with freejoint -->
-    <body name="ball" pos="0.5 0.3 0.7">
-      <freejoint name="ball_free"/>
-      <geom name="ball_geom" type="sphere" size="0.02" material="ball_red"/>
+    <!-- Cylinder object -->
+    <body name="cylinder" pos="0.5 0.3 0.68">
+      <freejoint name="cylinder_free"/>
+      <geom name="cylinder_geom" type="cylinder" size="0.02 0.03" material="ball_red"/>
     </body>
 
     <!-- Ground plane -->

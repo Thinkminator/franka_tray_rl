@@ -18,7 +18,7 @@ from envs.torquesensor.torquesensor_env import TorqueSensorEnv
 
 def main():
     # Initialize environment
-    env = TorqueSensorEnv(model_path="assets/panda_tray_torque/panda_tray_ball_torque.xml")
+    env = TorqueSensorEnv(model_path="assets/panda_tray/panda_tray_cylinder_torque.xml")
     # Reset env
     obs = env.reset()
     print("Initial observation:", obs)
