@@ -1,5 +1,6 @@
-🥼 Franka Tray RL
+# Franka Tray RL
 
+![alt text](image.png)
 
 This repository contains a custom MuJoCo + Gym environment for robotic manipulation with a Franka Panda arm, where the robot holds a tray and must balance/manipulate a cylinder for reinforcement learning research.
 
