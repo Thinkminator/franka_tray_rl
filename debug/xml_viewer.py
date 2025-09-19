@@ -10,7 +10,7 @@ def main():
     # Go 1 directory up if script is inside "scripts/"
     PROJECT_ROOT = os.path.join(PROJECT_ROOT, "..")
     os.chdir(PROJECT_ROOT)
-    xml_path = "assets/panda_tray/panda_tray_ball.xml"
+    xml_path = "assets/panda_tray_torque/panda_tray_ball_torque.xml"
     
     # Check if file exists
     if not os.path.exists(xml_path):
