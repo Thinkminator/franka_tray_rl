@@ -32,8 +32,13 @@ for i in range(num_joints):
         break
 
 # Desired tray target pose
-target_pos = [0.5, 0.3, 0.2]
-target_orn = p.getQuaternionFromEuler([0, 0, -0.87])
+target_pos = [0.5, 0.3, 0.65]
+target_orn = p.getQuaternionFromEuler([0, 0, -3.07])
+
+print("\nTarget pose:")
+print("  Position:", target_pos)
+print("  Orientation (quat):", target_orn)
+print("  Orientation (RPY):", [0, 0, -3.07])
 
 joint_positions = p.calculateInverseKinematics(
     bodyUniqueId=robot,
@@ -44,7 +49,7 @@ joint_positions = p.calculateInverseKinematics(
     residualThreshold=1e-4
 )
 
-print("IK solution = ", joint_positions[:7])
+print("\nIK solution = ", joint_positions[:7])
 p.disconnect()   # close pybullet
 
 # -------------------------------
@@ -59,7 +64,7 @@ mj_joint_names = [
     for i in range(model.njnt)
 ]
 
-print("MuJoCo joints:", mj_joint_names)
+print("\nMuJoCo joints:", mj_joint_names)
 
 # PyBullet / Panda joint naming convention (first 7 actuated joints)
 pb_joint_names = [f"panda_joint{i+1}" for i in range(7)]
@@ -73,11 +78,30 @@ for i, name in enumerate(pb_joint_names):
 # Update kinematics
 mujoco.mj_forward(model, data)
 
+# Get tray body ID
+tray_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "tray_base")
+if tray_body_id == -1:
+    print("Error: tray_base not found in MuJoCo model")
+else:
+    # Get actual tray pose in MuJoCo
+    actual_pos = data.xpos[tray_body_id].copy()
+    actual_quat = data.xquat[tray_body_id].copy()  # [w, x, y, z] format
+    
+    # Convert to [x, y, z, w] for scipy
+    from scipy.spatial.transform import Rotation as R
+    actual_rpy = R.from_quat([actual_quat[1], actual_quat[2], actual_quat[3], actual_quat[0]]).as_euler('xyz')
+    
+    print("\nActual MuJoCo tray pose:")
+    print("  Position:", actual_pos)
+    print("  Quaternion [w,x,y,z]:", actual_quat)
+    print("  Quaternion [x,y,z,w]:", [actual_quat[1], actual_quat[2], actual_quat[3], actual_quat[0]])
+    print("  RPY:", actual_rpy)
+
 # -------------------------------
 # 3) LAUNCH MUJOCO VIEWER (freeze joints)
 # -------------------------------
 with mujoco.viewer.launch_passive(model, data) as viewer:
-    print("Pose frozen at IK result. Press Ctrl+C to exit MuJoCo viewer")
+    print("\nPose frozen at IK result. Press Ctrl+C to exit MuJoCo viewer")
     while viewer.is_running():
         # NO mj_step() -> physics is not executed, pose is frozen
         viewer.sync()
