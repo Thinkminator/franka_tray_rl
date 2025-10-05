@@ -48,10 +48,10 @@ def start_ui_process(command_queue, status_queue):
         row=0, column=0, columnspan=4, pady=5)
     
     controls = [
-        ("X+", 0, 0.05), ("X-", 0, -0.05),
-        ("Y+", 1, 0.05), ("Y-", 1, -0.05),
-        ("Z+", 2, 0.05), ("Z-", 2, -0.05),
-        ("Yaw+", 3, 0.1), ("Yaw-", 3, -0.1)
+        ("X+", 0, 0.005), ("X-", 0, -0.005),
+        ("Y+", 1, 0.005), ("Y-", 1, -0.005),
+        ("Z+", 2, 0.005), ("Z-", 2, -0.005),
+        ("Yaw+", 3, 0.05), ("Yaw-", 3, -0.05)
     ]
     
     for i, (label, axis, delta) in enumerate(controls):
@@ -150,8 +150,8 @@ def run_mujoco_with_ui(command_queue, status_queue):
     pb_joint_names = [f"panda_joint{i+1}" for i in range(7)]
     
     # State variables
-    tray_pos = [0.65, 1.35, 0.8]  # Reachable starting position
-    tray_yaw = -1.47
+    tray_pos = [0.785, 0.107, 0.619]  # Reachable starting position
+    tray_yaw = 2.11
     joint_positions = [0.0] * 7
     
     def get_tray_pose_from_mujoco():

@@ -44,7 +44,7 @@ class TrayPoseEnv(gym.Env):
         self.goal_tray_rpy = np.array([0.0, 0.0, -1.47], dtype=np.float64)
 
         # Cylinder initial placement
-        self.start_cylinder = np.array([1.0, 0.0, 0.70], dtype=np.float64)
+        self.start_cylinder = np.array([0.788, 0.108, 0.641], dtype=np.float64)
 
         self.t = 0
         self.max_steps = 500

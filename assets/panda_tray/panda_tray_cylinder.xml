@@ -94,7 +94,7 @@
     </body>
 
     <!-- Cylinder object -->
-    <body name="cylinder" pos="0.5 0.3 0.68">
+    <body name="cylinder" pos="0.788 0.108 0.655">
       <freejoint name="cylinder_free"/>
       <geom name="cylinder_geom" type="cylinder" size="0.02 0.03" material="ball_red"/>
     </body>

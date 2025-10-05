@@ -23,8 +23,8 @@ MJCF_PATH = "assets/panda_tray/panda_tray_cylinder.xml"
 MUJOCO_MODEL_TYPE = "xml"  # Change to "urdf" to load URDF instead
 
 # Desired tray target pose
-target_pos = [0.65, 0.50, 0.80]
-target_rpy = [0, 0, -1.47]
+target_pos = [0.785, 0.107, 0.619]
+target_rpy = [0, 0, 2.11]
 
 print(f"\nMuJoCo will load: {MUJOCO_MODEL_TYPE.upper()}")
 print(f"Target pose:")
@@ -143,29 +143,6 @@ else:
     print(f"  Achieved yaw:       {actual_rpy[2]:.4f} rad ({np.degrees(actual_rpy[2]):.2f}°)")
     print(f"  Yaw error:          {yaw_error:.4f} rad ({np.degrees(yaw_error):.2f}°)")
     print("="*60)
-
-# Optional: also show tray_base pose for comparison
-tray_base_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "tray_base")
-if tray_base_id != -1:
-    base_pos = data.xpos[tray_base_id].copy()
-    base_quat = data.xquat[tray_base_id].copy()
-    base_rpy = body_rpy_from_xquat(base_quat)
-    
-    print("\n" + "="*60)
-    print("TRAY_BASE POSE IN MUJOCO (for reference)")
-    print("="*60)
-    print(f"  Position:           {np.round(base_pos, 4).tolist()}")
-    print(f"  Quaternion [w,x,y,z]: {np.round(base_quat, 4).tolist()}")
-    print(f"  RPY [r,p,y]:        {np.round(base_rpy, 4).tolist()}")
-    print("="*60)
-
-# Print joint configuration
-print("\n" + "="*60)
-print("JOINT CONFIGURATION")
-print("="*60)
-for i, name in enumerate(pb_joint_names):
-    print(f"  {name}: {joint_positions[i]:.4f} rad ({np.degrees(joint_positions[i]):.2f}°)")
-print("="*60)
 
 # -------------------------------
 # 4) LAUNCH MUJOCO VIEWER (freeze joints)
