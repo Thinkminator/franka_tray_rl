@@ -63,21 +63,27 @@
                     <geom type="mesh" mesh="link7" material="panda_white"/>
                     
                     <!-- End Effector -->
-                    <body name="panda_EndEffector" pos="0 0 0.107" quat="0.9238795 0 0 0.3826834">
+                    <body name="panda_EndEffector" pos="0 0 0.107" quat="0.92106099 0 0 0.38941834">
                       
-                      <!-- Tray attached to end effector -->
-                      <body name="tray_base" pos="0 0 0.09" quat="0.7071068 0 0.7071068 0">
+                      <!-- Intermediate frame (IK/target frame) -->
+                      <!-- Previously tray_base was directly here at pos="0 0 0.09" quat="0.7071068 0 0.7071068 0" -->
+                      <body name="tray_frame" pos="0 0 0.09" quat="0.7071068 0 0.7071068 0">
                         
-                        <!-- Tray base -->
-                        <geom name="tray_base_geom" type="box" size="0.08 0.12 0.005" material="tray_black"/>
+                        <!-- Physical tray stays attached with identity transform -->
+                        <body name="tray_base" pos="0 0 0" quat="1 0 0 0">
+                          
+                          <!-- Tray base -->
+                          <geom name="tray_base_geom" type="box" size="0.08 0.12 0.005" material="tray_black"/>
+                          
+                          <!-- Tray rims -->
+                          <geom name="tray_rim_xpos" type="box" size="0.01 0.12 0.005" pos="0.08 0 0.01" material="tray_rim"/>
+                          <geom name="tray_rim_xneg" type="box" size="0.01 0.12 0.005" pos="-0.08 0 0.01" material="tray_rim"/>
+                          <geom name="tray_rim_ypos" type="box" size="0.08 0.01 0.005" pos="0 0.12 0.01" material="tray_rim"/>
+                          <geom name="tray_rim_yneg" type="box" size="0.08 0.01 0.005" pos="0 -0.12 0.01" material="tray_rim"/>
                         
-                        <!-- Tray rims -->
-                        <geom name="tray_rim_xpos" type="box" size="0.01 0.12 0.005" pos="0.08 0 0.01" material="tray_rim"/>
-                        <geom name="tray_rim_xneg" type="box" size="0.01 0.12 0.005" pos="-0.08 0 0.01" material="tray_rim"/>
-                        <geom name="tray_rim_ypos" type="box" size="0.08 0.01 0.005" pos="0 0.12 0.01" material="tray_rim"/>
-                        <geom name="tray_rim_yneg" type="box" size="0.08 0.01 0.005" pos="0 -0.12 0.01" material="tray_rim"/>
-                      </body>
-                    </body>
+                        </body> <!-- tray_base -->
+                      </body> <!-- tray_frame -->
+                    </body> <!-- panda_EndEffector -->
                   </body>
                 </body>
               </body>

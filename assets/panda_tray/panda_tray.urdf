@@ -1,5 +1,4 @@
 <?xml version="1.0" ?>
-
 <robot name="panda_tray" xmlns:xacro="http://www.ros.org/wiki/xacro">
   
   <link name="panda_link0">
@@ -16,9 +15,10 @@
       <material name="panda_gray"/>
     </collision>
     <inertial>
-        <origin rpy="0 0 0" xyz="0 0 0"/>
-        <mass value="2.8142028896"/>
-        <inertia ixx="0.0129886979" ixy="0.0" ixz="0.0" iyy="0.0165355284" iyz="0" izz="0.0203311636"/>    </inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <mass value="2.8142028896"/>
+      <inertia ixx="0.0129886979" ixy="0.0" ixz="0.0" iyy="0.0165355284" iyz="0" izz="0.0203311636"/>
+    </inertial>
   </link>
   
   <link name="panda_link1">
@@ -234,9 +234,9 @@
   <!-- FLANGE -->
   <link name="panda_EndEffector">
     <inertial>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
-        <mass value="0.01"/>
-        <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
     </inertial>
   </link>
 
@@ -247,10 +247,27 @@
     <axis xyz="0 0 0"/>
   </joint>
 
+  <!-- Fixed joint from end-effector to an intermediate frame link -->
   <joint name="panda_tray_fixed" type="fixed">
     <parent link="panda_EndEffector"/>
-    <child link="tray_base"/>
+    <child link="tray_frame"/>
     <origin xyz="0 0 0.09" rpy="0 1.57079632679 0"/>
+  </joint>
+
+  <!-- Intermediate frame link (massless, no geometry) -->
+  <link name="tray_frame">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.001"/>
+      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+    </inertial>
+  </link>
+
+  <!-- Joint to adjust tray_base frame orientation without moving geometry -->
+  <joint name="tray_frame_to_base" type="fixed">
+    <parent link="tray_frame"/>
+    <child link="tray_base"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
   <!-- Tray Definition -->
@@ -260,21 +277,24 @@
       <mass value="0.5"/>
       <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.0015" iyz="0" izz="0.002"/>
     </inertial>
+
     <collision name="tray_base_collision">
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry><box size="0.16 0.24 0.01"/></geometry>
     </collision>
+
     <visual name="tray_base_visual">
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry><box size="0.16 0.24 0.01"/></geometry>
       <material name="gray"/>
     </visual>
+
     <!-- +X rim -->
     <collision name="tray_rim_xpos_collision">
       <origin xyz="0.08 0 0.01" rpy="0 0 0"/>
       <geometry><box size="0.02 0.24 0.01"/></geometry>
     </collision>
-    <visual >
+    <visual>
       <origin xyz="0.08 0 0.01" rpy="0 0 0"/>
       <geometry><box size="0.02 0.24 0.01"/></geometry>
       <material name="rim"><color rgba="0.4 0.4 0.4 1"/></material>
@@ -312,9 +332,9 @@
   </link>
       
   <material name="panda_white">
-    <color rgba="1. 1. 1. 1."/>
+    <color rgba="1.0 1.0 1.0 1.0"/>
   </material>
   <material name="panda_gray">
-    <color rgba=".8 .8 .8 1."/>
+    <color rgba="0.8 0.8 0.8 1.0"/>
   </material>
 </robot>
