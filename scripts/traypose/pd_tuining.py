@@ -1,169 +1,208 @@
 #!/usr/bin/env python3
+"""
+Systematic PD gain search for Panda arm holding pose under tray load.
+Tests combinations of Kq multipliers and reports best stable configuration.
+"""
 import os
 import sys
-import time
-import csv
-import itertools
-import multiprocessing as mp
-from typing import Tuple, Dict, Any, List
-
 import numpy as np
+import mujoco
 
-# Ensure project root available so we can import env
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+os.chdir(PROJECT_ROOT)
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from envs.traypose.traypose_env import TrayPoseEnv
 
-# Tuning config
-MODEL_PATH = "assets/panda_tray/panda_tray_cylinder.xml"
-NUM_WORKERS = max(1, mp.cpu_count() - 1)
 
-# Grid (or random) search params
-KP_VALUES = [20.0, 30.0, 40.0, 50.0]          # proportional gains to try
-KD_VALUES = [2.0, 5.0, 8.0, 12.0]             # derivative gains to try
-MAX_INC_VALUES = [0.003, 0.005, 0.008, 0.012] # max_joint_increment (radians/step)
-
-# Evaluation settings
-N_EPISODES_PER_SETTING = 6
-EPISODE_MAX_STEPS = 300
-ACTION_SCALE = 0.8   # scale applied to env.action_space.sample() to simulate agent magnitude
-DROP_Z_THRESHOLD = 0.1  # same as your env drop threshold
-
-OUTPUT_CSV = "tuning_results.csv"
-
-
-def evaluate_setting(params: Tuple[float, float, float], seed: int = 0) -> Dict[str, Any]:
-    """Evaluate a single parameter setting. Returns metrics dict."""
-    kp, kd, max_inc = params
-    # Create environment
-    env = TrayPoseEnv(model_path=MODEL_PATH)
-    # Set tunable params
-    env.kp = float(kp)
-    env.kd = float(kd)
-    env.max_joint_increment = float(max_inc)
-
-    rng = np.random.RandomState(seed)
-
-    total_rewards = []
-    drops = 0
-    mean_min_offsets = []
-
-    for ep in range(N_EPISODES_PER_SETTING):
-        obs = env.reset()
-        ep_reward = 0.0
-        min_offset = float("inf")
-        dropped = False
-
-        # Warmup: some zero steps to settle dynamics (optional)
-        for _ in range(3):
-            obs, _, _, _ = env.step(np.zeros(env.action_space.shape, dtype=np.float32))
-
-        for t in range(EPISODE_MAX_STEPS):
-            # sample a small random action to emulate agent behavior
-            a = env.action_space.sample().astype(np.float32)
-            # scale action magnitude
-            a = a * ACTION_SCALE
-            obs, rew, done, info = env.step(a)
-            ep_reward += float(rew)
-
-            # track cylinder offset (XY)
-            cyl = env._get_cylinder_xyz()
-            tray = env.tray_pos.copy()
-            offset = np.linalg.norm(cyl[:2] - tray[:2])
-            if offset < min_offset:
-                min_offset = offset
-
-            # detect drop
-            if cyl[2] < DROP_Z_THRESHOLD:
-                dropped = True
-                drops += 1
-                break
-
-            if done:
-                break
-
-        total_rewards.append(ep_reward)
-        mean_min_offsets.append(min_offset)
-
-    env.close()
-
-    avg_reward = float(np.mean(total_rewards))
-    drop_rate = float(drops) / float(N_EPISODES_PER_SETTING)
-    avg_min_offset = float(np.mean(mean_min_offsets))
-
-    return {
-        "kp": kp,
-        "kd": kd,
-        "max_inc": max_inc,
-        "avg_reward": avg_reward,
-        "drop_rate": drop_rate,
-        "avg_min_offset": avg_min_offset,
-        "n_episodes": N_EPISODES_PER_SETTING
-    }
+def evaluate_gains(env, Kq, Dq, hold_seconds=2.0, verbose=False):
+    """
+    Test given gains by holding start pose with zero action.
+    Returns: (max_pos_error_rad, max_vel, saturation_fraction, tray_drop_cm)
+    """
+    # Backup current gains
+    Kq_backup, Dq_backup = env.Kq.copy(), env.Dq.copy()
+    env.Kq, env.Dq = Kq.copy(), Dq.copy()
+    
+    # Reset to start pose
+    env.reset()
+    q_ref = env._get_arm_qpos().copy()
+    tray_z_start = env.tray_pos[2]
+    
+    n_steps = int(hold_seconds / env.control_dt)
+    max_pos_err = 0.0
+    max_vel = 0.0
+    total_sat = 0
+    total_torque_checks = 0
+    
+    for step in range(n_steps):
+        # Zero action
+        action = np.zeros(7, dtype=np.float32)
+        env.step(action)
+        
+        # Track errors
+        q_now = env._get_arm_qpos()
+        qd_now = env._get_arm_qvel()
+        pos_err = np.abs(q_now - q_ref)
+        max_pos_err = max(max_pos_err, float(np.max(pos_err)))
+        max_vel = max(max_vel, float(np.max(np.abs(qd_now))))
+        
+        # Check saturation (compute raw tau before clipping)
+        err = env.q_des - q_now
+        tau_raw = env.Kq * err - env.Dq * qd_now
+        tau_raw += np.array([env.data.qfrc_bias[d] for d in env.arm_dofadr], dtype=np.float64)
+        
+        saturated = np.abs(tau_raw) > env.tau_limits
+        total_sat += np.sum(saturated)
+        total_torque_checks += 7
+    
+    tray_z_end = env.tray_pos[2]
+    tray_drop_cm = (tray_z_start - tray_z_end) * 100.0  # convert to cm
+    sat_fraction = total_sat / total_torque_checks if total_torque_checks > 0 else 0.0
+    
+    # Restore gains
+    env.Kq, env.Dq = Kq_backup, Dq_backup
+    
+    if verbose:
+        print(f"    max_err={max_pos_err*180/np.pi:.2f}°, max_vel={max_vel:.3f} rad/s, "
+              f"sat={sat_fraction*100:.1f}%, tray_drop={tray_drop_cm:.2f} cm")
+    
+    return max_pos_err, max_vel, sat_fraction, tray_drop_cm
 
 
-def worker_task(args):
-    params, seed = args
-    try:
-        return evaluate_setting(params, seed)
-    except Exception as e:
-        # Return failure record
-        return {
-            "kp": params[0],
-            "kd": params[1],
-            "max_inc": params[2],
-            "avg_reward": -1e9,
-            "drop_rate": 1.0,
-            "avg_min_offset": 1e9,
-            "error": str(e)
-        }
+def grid_search_gains(env, hold_seconds=2.0):
+    """
+    Grid search over gain multipliers for proximal (1-4) and distal (5-7) joints.
+    """
+    base_Kq = np.array([200.0, 200.0, 200.0, 150.0, 100.0, 80.0, 60.0], dtype=np.float64)
+    
+    # Search ranges
+    prox_multipliers = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0]
+    dist_multipliers = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+    
+    results = []
+    
+    print(f"\n{'='*80}")
+    print(f"GRID SEARCH: Testing {len(prox_multipliers)} × {len(dist_multipliers)} = "
+          f"{len(prox_multipliers)*len(dist_multipliers)} combinations")
+    print(f"Hold duration: {hold_seconds}s")
+    print(f"Base Kq: {base_Kq}")
+    print(f"{'='*80}\n")
+    
+    total_tests = len(prox_multipliers) * len(dist_multipliers)
+    test_num = 0
+    
+    for m_prox in prox_multipliers:
+        for m_dist in dist_multipliers:
+            test_num += 1
+            
+            # Build gains
+            Kq = base_Kq.copy()
+            Kq[:4] *= m_prox
+            Kq[4:] *= m_dist
+            Dq = 2.0 * np.sqrt(Kq)
+            
+            print(f"[{test_num}/{total_tests}] Testing m_prox={m_prox:.1f}, m_dist={m_dist:.1f}")
+            print(f"  Kq = {Kq}")
+            
+            max_err, max_vel, sat_frac, tray_drop = evaluate_gains(
+                env, Kq, Dq, hold_seconds=hold_seconds, verbose=True
+            )
+            
+            results.append({
+                'm_prox': m_prox,
+                'm_dist': m_dist,
+                'Kq': Kq.copy(),
+                'Dq': Dq.copy(),
+                'max_err_deg': max_err * 180 / np.pi,
+                'max_vel': max_vel,
+                'sat_frac': sat_frac,
+                'tray_drop_cm': tray_drop,
+                'score': compute_score(max_err, max_vel, sat_frac, tray_drop)
+            })
+    
+    return results
+
+
+def compute_score(max_err, max_vel, sat_frac, tray_drop_cm):
+    """
+    Lower is better. Penalize:
+    - Position error (most important)
+    - Tray drop (critical)
+    - Saturation (bad for control)
+    - High velocities (instability)
+    """
+    err_penalty = max_err * 1000.0  # rad to score
+    drop_penalty = abs(tray_drop_cm) * 10.0  # cm drop
+    sat_penalty = sat_frac * 50.0
+    vel_penalty = max_vel * 5.0
+    
+    return err_penalty + drop_penalty + sat_penalty + vel_penalty
+
+
+def print_top_results(results, top_n=10):
+    """Print best configurations"""
+    sorted_results = sorted(results, key=lambda x: x['score'])
+    
+    print(f"\n{'='*80}")
+    print(f"TOP {top_n} CONFIGURATIONS (lower score = better)")
+    print(f"{'='*80}\n")
+    
+    for i, res in enumerate(sorted_results[:top_n], 1):
+        print(f"#{i} | Score: {res['score']:.2f}")
+        print(f"    m_prox={res['m_prox']:.1f}, m_dist={res['m_dist']:.1f}")
+        print(f"    Kq = {res['Kq']}")
+        print(f"    Dq = {res['Dq']}")
+        print(f"    Max error: {res['max_err_deg']:.2f}°")
+        print(f"    Max vel: {res['max_vel']:.3f} rad/s")
+        print(f"    Saturation: {res['sat_frac']*100:.1f}%")
+        print(f"    Tray drop: {res['tray_drop_cm']:.2f} cm")
+        print()
+    
+    # Print best as code snippet
+    best = sorted_results[0]
+    print(f"{'='*80}")
+    print("RECOMMENDED GAINS (paste into __init__):")
+    print(f"{'='*80}")
+    print(f"self.Kq = np.array({list(best['Kq'])}, dtype=np.float64)")
+    print(f"self.Dq = np.array({list(best['Dq'])}, dtype=np.float64)")
+    print(f"{'='*80}\n")
 
 
 def main():
-    # Build grid of parameter combos
-    param_grid = list(itertools.product(KP_VALUES, KD_VALUES, MAX_INC_VALUES))
-    print(f"Evaluating {len(param_grid)} parameter combinations using {NUM_WORKERS} workers...")
-
-    # Create seeds for reproducibility
-    seeds = [int(time.time()) + i for i in range(len(param_grid))]
-
-    tasks = [(param_grid[i], seeds[i % len(seeds)]) for i in range(len(param_grid))]
-
-    # Parallel evaluation
-    results: List[Dict[str, Any]] = []
-    if NUM_WORKERS > 1:
-        with mp.Pool(NUM_WORKERS) as pool:
-            for res in pool.imap_unordered(worker_task, tasks):
-                results.append(res)
-                print(f"Finished: kp={res['kp']} kd={res['kd']} max_inc={res['max_inc']} "
-                      f"drop_rate={res['drop_rate']:.3f} avg_reward={res['avg_reward']:.2f}")
-    else:
-        for task in tasks:
-            res = worker_task(task)
-            results.append(res)
-            print(f"Finished: kp={res['kp']} kd={res['kd']} max_inc={res['max_inc']} "
-                  f"drop_rate={res['drop_rate']:.3f} avg_reward={res['avg_reward']:.2f}")
-
-    # Save to CSV
-    keys = ["kp", "kd", "max_inc", "avg_reward", "drop_rate", "avg_min_offset", "n_episodes"]
-    with open(OUTPUT_CSV, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=keys)
-        writer.writeheader()
+    print("\n🔧 Initializing environment for gain search...")
+    env = TrayPoseEnv(model_path="assets/panda_tray/panda_tray_cylinder.xml")
+    
+    # Run grid search
+    results = grid_search_gains(env, hold_seconds=2.0)
+    
+    # Print results
+    print_top_results(results, top_n=15)
+    
+    # Save to file
+    import json
+    output_file = "gain_search_results.json"
+    with open(output_file, 'w') as f:
+        # Convert numpy arrays to lists for JSON
+        json_results = []
         for r in results:
-            row = {k: r.get(k, None) for k in keys}
-            writer.writerow(row)
-    print(f"Saved results to {OUTPUT_CSV}")
-
-    # Print best candidates sorted by (lowest drop rate, highest avg_reward)
-    valid = [r for r in results if "error" not in r]
-    sorted_by = sorted(valid, key=lambda r: (r["drop_rate"], -r["avg_reward"], r["avg_min_offset"]))
-    print("\nTop 8 parameter sets (sorted by drop rate then avg_reward):")
-    for r in sorted_by[:8]:
-        print(r)
-
-    print("\nDone.")
+            json_results.append({
+                'm_prox': r['m_prox'],
+                'm_dist': r['m_dist'],
+                'Kq': r['Kq'].tolist(),
+                'Dq': r['Dq'].tolist(),
+                'max_err_deg': r['max_err_deg'],
+                'max_vel': r['max_vel'],
+                'sat_frac': r['sat_frac'],
+                'tray_drop_cm': r['tray_drop_cm'],
+                'score': r['score']
+            })
+        json.dump(json_results, f, indent=2)
+    
+    print(f"✓ Full results saved to {output_file}")
+    
+    env.close()
 
 
 if __name__ == "__main__":
