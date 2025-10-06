@@ -3,22 +3,23 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.9  # Or 3.10, 3.11 - choose your preferred version
+  - python=3.10
   - pip
   - numpy
   - scipy
   - matplotlib
   - jupyter
   - ipykernel
-  - pybullet  # For your initial environment setup as mentioned in the proposal
-  - dm_control  # For MuJoCo integration and utilities
-  - mujoco  # The official MuJoCo Python bindings
-  - gymnasium  # Standardized API for RL environments (formerly gym)
-  - stable-baselines3  # For PPO implementation
-  - pytorch  # Or tensorflow, depending on your preference for Stable-Baselines3 backend
-  - tensorboard  # For logging and visualization during RL training
+  - mujoco>=3.1        # official MuJoCo Python bindings
+  - gymnasium>=0.28
+  - shimmy>=1.3.0      # gym<->gymnasium compatibility layer (SB3 uses it)
+  - stable-baselines3  # v2.x from conda-forge is Gymnasium-ready
+  - pytorch            # CPU-only; for GPU use "pytorch-cuda" (see notes)
+  - tensorboard
+  - yaml               # libyaml bindings (PyYAML comes via pip below)
   - pip:
-    - mujoco-python-viewer # A simple viewer for MuJoCo models
-    - transforms3d # Useful for rigid body transformations
-    - hydra-core # For configuration management (optional but good for RL projects)
-    - omegaconf # Hydra dependency
+      - mujoco-python-viewer
+      - transforms3d
+      - hydra-core
+      - omegaconf
+      - pyyaml

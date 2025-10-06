@@ -32,9 +32,9 @@ def evaluate_model(model_path, num_episodes=3):
     # Launch MuJoCo viewer
     with mujoco.viewer.launch_passive(env.model, env.data) as viewer:
         for ep in range(num_episodes):
-            obs = env.reset()
+            obs, info = env.reset()
             done = False
-            ep_reward = 0
+            ep_reward = 0.0
             step_count = 0
             
             print(f"\nStarting Episode {ep+1}")
@@ -43,9 +43,10 @@ def evaluate_model(model_path, num_episodes=3):
                 # Get action from trained model
                 action, _states = model.predict(obs, deterministic=True)
                 
-                # Take step in environment
-                obs, reward, done, info = env.step(action)
-                ep_reward += reward
+                # Take step in environment (Gymnasium API)
+                obs, reward, terminated, truncated, info = env.step(action)
+                done = terminated or truncated
+                ep_reward += float(reward)
                 
                 # Update MuJoCo internal state
                 mujoco.mj_forward(env.model, env.data)
@@ -55,7 +56,7 @@ def evaluate_model(model_path, num_episodes=3):
                 
                 # Print progress every 50 steps
                 if step_count % 50 == 0:
-                    print(f"  Step {step_count}, Reward: {reward:.3f}")
+                    print(f"  Step {step_count}, Reward: {reward:.3f}, Terminated={terminated}, Truncated={truncated}")
                 
                 step_count += 1
                 time.sleep(env.control_dt)  # Maintain real-time speed
@@ -63,7 +64,7 @@ def evaluate_model(model_path, num_episodes=3):
             print(f"Episode {ep+1} finished after {step_count} steps with reward: {ep_reward:.3f}")
             all_rewards.append(ep_reward)
 
-    avg_reward = sum(all_rewards) / num_episodes
+    avg_reward = float(np.mean(all_rewards)) if all_rewards else 0.0
     print(f"\nAverage reward over {num_episodes} episodes: {avg_reward:.3f}")
 
 if __name__ == "__main__":

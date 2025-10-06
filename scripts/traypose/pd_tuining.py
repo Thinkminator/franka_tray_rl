@@ -26,7 +26,7 @@ def evaluate_gains(env, Kq, Dq, hold_seconds=2.0, verbose=False):
     env.Kq, env.Dq = Kq.copy(), Dq.copy()
     
     # Reset to start pose
-    env.reset()
+    _, _ = env.reset()
     q_ref = env._get_arm_qpos().copy()
     tray_z_start = env.tray_pos[2]
     
@@ -182,7 +182,7 @@ def main():
     
     # Save to file
     import json
-    output_file = "gain_search_results.json"
+    output_file = "jointpos/gain_search_results.json"
     with open(output_file, 'w') as f:
         # Convert numpy arrays to lists for JSON
         json_results = []

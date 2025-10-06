@@ -1,18 +1,54 @@
-env:
-  name: TrayPoseEnv
-  model_path: assets/panda_tray/panda_tray.urdf
-  max_steps: 500
-  start_tray: [0.5, 0.3, 0.65]
-  start_yaw: -3.07
-  goal_tray: [0.5, -0.35, 0.2]
-  goal_yaw: -4.57
-  start_ball: [0.5, 0.3, 0.7]
+model_path: "assets/panda_tray/panda_tray_cylinder.xml"
 
-reward:
-  ball_offset_weight: 1.0
-  tray_distance_weight: 1.0
+control:
+  control_dt: 0.02
+  substeps: 10
+  max_joint_increment: 0.04
+  tau_limits: [87, 87, 87, 87, 12, 12, 12]
 
-training:
-  seed: 123
-  episodes: 10000
-  gamma: 0.99
+observation:
+  noise_std_pos: 0.0
+  noise_std_vel: 0.0
+  use_jacobian_tray_obs: false
+
+start:
+  tray_pos: [0.788, 0.108, 0.621]
+  tray_rpy: [0.0, 0.0, 2.111]
+  joints:   [0.41, 1.16, -0.79, -0.11, -0.73, 1.77, 0.42]
+  cylinder: [0.788, 0.108, 0.655]
+
+goal:
+  tray_pos: [0.65, 0.50, 0.80]
+  tray_rpy: [0.0, 0.0, -1.47]
+  pos_tolerance: 0.03
+  yaw_tolerance_deg: 5.0
+  success_hold_steps: 5
+  max_steps: 150
+
+pd_gains:
+  Kq: [2000.0, 2000.0, 2000.0, 1500.0, 500.0, 400.0, 300.0]
+  Dq: [89.4427191, 89.4427191, 89.4427191, 77.45966692, 44.72135955, 40.0, 34.64101615]
+
+limits:
+  joint_low:  [-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973]
+  joint_high: [ 2.8973,  1.7628,  2.8973, -0.0698,  2.8973,  3.7525,  2.8973]
+
+penalties:
+  base_step: -0.1
+  idle_action: -0.4
+  rim: -0.5
+  drop: -10.0
+  topple: -5.0
+
+rim_zone:   # tray-frame half-lengths after radius margin
+  x_min: -0.05
+  x_max:  0.05
+  y_min: -0.09
+  y_max:  0.09
+
+drop_check:
+  center_to_center_margin: 0.09  # your chosen simple check
+
+success_reward:
+  alpha: 50.0   # scale in final bonus: max(0, 5 - alpha*offset)
+  max_bonus: 5.0
