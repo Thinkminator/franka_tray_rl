@@ -2,24 +2,65 @@ name: franka_tray_rl
 channels:
   - conda-forge
   - defaults
+channel_priority: strict
+
 dependencies:
-  - python=3.10
+  # Core Python
+  - python=3.9
   - pip
   - numpy
   - scipy
+  - pandas
   - matplotlib
+  - tqdm
+  - pyyaml
+  - requests
+
+  # Jupyter
   - jupyter
-  - ipykernel
-  - mujoco>=3.1        # official MuJoCo Python bindings
-  - gymnasium>=0.28
-  - shimmy>=1.3.0      # gym<->gymnasium compatibility layer (SB3 uses it)
-  - stable-baselines3  # v2.x from conda-forge is Gymnasium-ready
-  - pytorch            # CPU-only; for GPU use "pytorch-cuda" (see notes)
-  - tensorboard
-  - yaml               # libyaml bindings (PyYAML comes via pip below)
+  - ipywidgets
+
+  # RL / Gym ecosystems
+  - gym=0.21        # for older gym APIs if you need them
+  - dm-env
+  - dm-tree
+  - farama-notifications
+
+  # MuJoCo stack
+  - mujoco=3.3.2
+  - mujoco-python=3.3.2
+  - libmujoco=3.3.2
+  - pyglfw                 # Python glfw bindings
+  - pyopengl
+  - glfw                   # system glfw library (loosened, no build pin)
+  - qt6-main               # for mujoco-viewer Qt backend needs
+  - pyside6                # optional, used by some viewers
+
+  # Physics/alt simulators
+  - pybullet
+
+  # Plotting/extras
+  - seaborn
+
+  # Optional: CPU PyTorch (portable)
+  - pytorch
+  # If you want CUDA build instead (pick ONE of the below and remove the other):
+  # - pytorch cudatoolkit=11.8
+  # Or for newer CUDA on conda-forge:
+  # - pytorch
+  # - pytorch-cuda=12.1  # requires NVIDIA drivers compatible with CUDA 12.1
+
+  # Misc utils
+  - cloudpickle
   - pip:
-      - mujoco-python-viewer
-      - transforms3d
-      - hydra-core
-      - omegaconf
-      - pyyaml
+      - gymnasium==1.1.1
+      - shimmy==2.0.0
+      - stable-baselines3==2.7.0
+      - mujoco-python-viewer==0.1.4
+      - transforms3d==0.4.2
+      - imageio
+      - opencv-python
+      - rich
+      - hydra-core==1.3.2
+      - omegaconf==2.3.0
+      - tensorboard
