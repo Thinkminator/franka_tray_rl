@@ -1,1 +1,1 @@
-from .torquesensor_env import TorqueSensorEnv
+from .traypose_env import TrayPoseEnv
