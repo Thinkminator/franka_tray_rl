@@ -36,7 +36,7 @@ This repository contains a custom MuJoCo + Gym environment for robotic manipulat
     │       ├── config.yaml         # Config file (parameters)
     │       └── traypose_env.py     # Core `TrayPoseEnv` class
     │
-    ├── jointpos/                   # (Placeholder for joint position controllers)
+    ├── jointpos/                   # Placeholder for joint position values to define start & goal pose
     │   └── config.txt              # Tested start and goal position info
     ├── scripts/                    # Runnable scripts
     │   ├── torquesensor/
@@ -46,7 +46,7 @@ This repository contains a custom MuJoCo + Gym environment for robotic manipulat
     |       ├── train_traypose.py       # Train models
     │       └── visualize_traypose.py   # Demo script with MuJoCo viewer
     │
-    └── training/                   # (Placeholder for RL training data)
+    └── training/                   # Folder for RL training data
 
 ## 🦾 Environment: 
 ### 1. TrayPoseEnv
@@ -88,4 +88,4 @@ You can plug TrayPoseEnv into RL libraries like Stable-Baselines3 or RLlib.
 📌 TODO roadmap
 - Add torque-sensor env
 - Release pre-trained models
-- [Future] Integrate RGB-D camera inputs (depthcamera env)
+- [Future] Integrate RGB-D camera inputs (depthcamera env) to track cylinder
