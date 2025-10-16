@@ -68,7 +68,7 @@ Setup Conda Environment:
 Visualize the tray-cylinder environment:
 
 
-    python3 scripts/traypose/visualize_traypose.py [Mode]
+    python scripts/traypose/visualize_traypose.py [Mode]
 
 
 - [Mode] = zero, seeded or random 
