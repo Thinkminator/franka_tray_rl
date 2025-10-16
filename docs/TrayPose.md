@@ -4,8 +4,9 @@
 TrayPoseEnv simulates a Franka Panda manipulating a tray with a free cylinder in MuJoCo. The agent issues 7D normalized joint increment actions; a joint-space PD controller with gravity compensation converts these into joint torques. The environment supports noisy observations and two ways of generating tray pose/velocity for observations: directly from MuJoCo or via Jacobian-based forward kinematics from joint states.
 
 - Control: joint-space torque PD + gravity compensation
+- Robot: Franka Panda with a tray fixed at end effector
 - Actuation: 7 revolute joints (panda_joint1..7)
-- Object: tray_base body and a cylinder (free joint)
+- Object: a cylinder (free joint)
 - Step time: control_dt with substeps internal physics updates
 - Configuration: via config.yaml, with constructor args overriding YAML
 
@@ -52,6 +53,8 @@ Noise:
 - observation.noise_std_pos adds Gaussian noise to q
 - observation.noise_std_vel adds Gaussian noise to dq
 - use_jacobian_tray_obs controls whether tray pose/vel in obs are derived via Jacobian from the (potentially noisy) joints or read directly from MuJoCo
+- cylinder_noise_std_pos adds Gaussian noise to the cylinder relative position
+- cylinder_noise_std_vel adds Gaussian noise to the cylinder relative velocity 
 
 Examples:
 ```python
@@ -63,6 +66,9 @@ env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05)
 
 # Noisy joint observations with Jacobian FK tray obs
 env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05, use_jacobian_tray_obs=True)
+
+# Noisy cylinder observation and joint observation with Jacobian FK tray obs
+env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05, cylinder_noise_std_pos=0.005, cylinder_noise_std_vel=0.01, use_jacobian_tray_obs=True)
 ```
 
 Precedence:
@@ -88,7 +94,7 @@ Base and penalties (all configurable):
   - rim_zone.x_min/x_max, y_min/y_max define tray-frame bounds after margins
 
 Termination penalties:
-- Drop: if cylinder z < tray_z − drop_check.center_to_center_margin → add penalties.drop and terminate
+- Drop: if cylinder z < tray_z − drop_margin → add penalties.drop and terminate
 - Topple: if cylinder axis tilts > 45° from upright → add penalties.topple and terminate
 
 Success bonus:
@@ -120,10 +126,13 @@ Info keys:
   - Applies zero actions for a fixed duration to verify hold pose and observe stability
 - Random action mode:
   - Applies random actions; logs state every 50 steps
+- Seeded action mode:
+  - Applies random actions from a fixed seed; logs state every 50 steps 
 
 Selecting mode:
-- python visualize_traypose.py zero
-- python visualize_traypose.py random
+- python scripts/traypose/visualize_traypose.py zero
+- python scripts/traypose/visualize_traypose.py random
+- python scripts/traypose/visualize_traypose.py seeded
 
 Viewer:
 - Uses mujoco.viewer.launch_passive to render in real time
@@ -133,7 +142,7 @@ Viewer:
 Key blocks:
 - model_path: XML path
 - control: control_dt, substeps, max_joint_increment, tau_limits
-- observation: noise_std_pos, noise_std_vel, use_jacobian_tray_obs
+- observation: noise_std_pos, noise_std_vel, use_jacobian_tray_obs, cylinder_noise_std_pos, cylinder_noise_std_vel
 - start: tray_pos, tray_rpy, joints, cylinder
 - goal: tray_pos, tray_rpy, pos_tolerance, yaw_tolerance_deg, success_hold_steps, max_steps
 - pd_gains: Kq, Dq
@@ -150,17 +159,10 @@ env = TrayPoseEnv(
     obs_noise_std_pos=0.005,
     obs_noise_std_vel=0.05,
     use_jacobian_tray_obs=True
+    cylinder_noise_std_pos: 0.005
+    cylinder_noise_std_vel: 0.01
 )
 ```
-
-#### Practical Tips
-- If the arm sags in zero-action mode:
-  - Ensure actuators are torque motors on Panda joints
-  - Check tau_limits and Kq/Dq; use autotune_hold_pose for quick adjustment
-- Set max_joint_increment realistically to avoid saturating torques and oscillations
-- When using Jacobian obs with noise, expect noisier tray velocity estimates—good for robustness training
-- Rim bounds: tune rim_zone to reflect your tray geometry and safety margins
-- Success sharpness: tune success_reward.alpha; larger alpha makes the bonus drop off faster with distance
 
 #### Quick Reference of Defaults (via YAML)
 - control_dt = 0.02 s, substeps = 10
@@ -168,6 +170,7 @@ env = TrayPoseEnv(
 - tau_limits = [87, 87, 87, 87, 12, 12, 12]
 - noise_std_pos = 0.0, noise_std_vel = 0.0
 - use_jacobian_tray_obs = false
+- cylinder_noise_std_pos: 0.0, cylinder_noise_std_vel: 0.0
 - success bonus: max_bonus = 5.0, alpha = 50.0
 - penalties: base −0.1, idle −0.4, rim −0.5, drop −10, topple −5
 - drop margin: 0.09 m
