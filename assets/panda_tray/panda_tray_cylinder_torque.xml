@@ -1,15 +1,13 @@
 <?xml version="1.0" ?>
-<mujoco model="panda_tray_cylinder_torque">
+<mujoco model="panda_tray_cylinder">
   <compiler angle="radian" coordinate="local" meshdir="." texturedir="."/>
   <option timestep="0.002" gravity="0 0 -9.81"/>
   
   <default>
     <joint damping="1" limited="true"/>
     <geom contype="1" conaffinity="1" condim="3"/>
-    <motor ctrlrange="-1 1" ctrllimited="true"/>
   </default>
 
-  <!-- MATERIALS -->
   <asset>
     <material name="panda_white" rgba="1 1 1 1"/>  
     <material name="panda_gray" rgba="0.8 0.8 0.8 1"/>
@@ -18,7 +16,6 @@
     <material name="ball_red" rgba="1 0 0 1"/>
     <material name="environment" rgba="0.8 0.8 0.8 1"/>
     
-    <!-- Panda link meshes -->
     <mesh name="link0" file="link0.stl"/>
     <mesh name="link1" file="link1.stl"/>
     <mesh name="link2" file="link2.stl"/>
@@ -30,59 +27,88 @@
   </asset>
 
   <worldbody>
-    <!-- Panda Robot -->
     <body name="panda_link0" pos="0 0 0">
+      <inertial pos="-4.1018e-02 -1.4e-04 4.9974e-02" mass="0.629769" 
+                fullinertia="3.15e-03 3.88e-03 4.285e-03 8.2904e-07 1.5e-04 8.2299e-06"/>
       <geom type="mesh" mesh="link0" material="panda_gray"/>
       
       <body name="panda_link1" pos="0 0 0.333">
-        <joint name="panda_joint1" type="hinge" pos="0 0 0" axis="0 0 1" range="-2.8973 2.8973" damping="1.0"/>
+        <inertial pos="3.875e-03 2.081e-03 -4.762e-02" mass="4.970684" 
+                  fullinertia="7.0337e-01 7.0661e-01 9.1170e-03 -1.3900e-04 6.7720e-03 1.9169e-02"/>
+        <joint name="panda_joint1" type="hinge" pos="0 0 0" axis="0 0 1" 
+               range="-2.8973 2.8973" damping="0.0665" frictionloss="0.2450"/>
         <geom type="mesh" mesh="link1" material="panda_white"/>
         
         <body name="panda_link2" pos="0 0 0" quat="0.7071068 -0.7071068 0 0">
-          <joint name="panda_joint2" type="hinge" axis="0 0 1" range="-1.7628 1.7628"/>
+          <inertial pos="-3.141e-03 -2.872e-02 3.495e-03" mass="0.646926" 
+                    fullinertia="7.9620e-03 2.8110e-02 2.5995e-02 -3.9250e-03 1.0254e-02 7.0400e-04"/>
+          <joint name="panda_joint2" type="hinge" axis="0 0 1" 
+                 range="-1.7628 1.7628" damping="0.1987" frictionloss="0.1523"/>
           <geom type="mesh" mesh="link2" material="panda_white"/>
           
           <body name="panda_link3" pos="0 -0.316 0" quat="0.7071068 0.7071068 0 0">
-            <joint name="panda_joint3" type="hinge" axis="0 0 1" range="-2.8973 2.8973"/>
+            <inertial pos="2.7518e-02 3.9252e-02 -6.6502e-02" mass="3.228604" 
+                      fullinertia="3.7242e-02 3.6155e-02 1.0830e-02 -4.7610e-03 -1.1396e-02 -1.2805e-02"/>
+            <joint name="panda_joint3" type="hinge" axis="0 0 1" 
+                   range="-2.8973 2.8973" damping="0.0399" frictionloss="0.1827"/>
             <geom type="mesh" mesh="link3" material="panda_white"/>
             
             <body name="panda_link4" pos="0.0825 0 0" quat="0.7071068 0.7071068 0 0">
-              <joint name="panda_joint4" type="hinge" axis="0 0 1" range="-3.0718 -0.0698"/>
+              <inertial pos="-5.317e-02 1.04419e-01 2.7454e-02" mass="3.587895" 
+                        fullinertia="2.5853e-02 1.9552e-02 2.8323e-02 7.7960e-03 -1.3320e-03 8.6410e-03"/>
+              <joint name="panda_joint4" type="hinge" axis="0 0 1" 
+                     range="-3.0718 -0.0698" damping="0.2257" frictionloss="0.3591"/>
               <geom type="mesh" mesh="link4" material="panda_white"/>
               
               <body name="panda_link5" pos="-0.0825 0.384 0" quat="0.7071068 -0.7071068 0 0">
-                <joint name="panda_joint5" type="hinge" axis="0 0 1" range="-2.8973 2.8973"/>
+                <inertial pos="-1.1953e-02 4.1065e-02 -3.8437e-02" mass="1.225946" 
+                          fullinertia="3.5549e-02 2.9474e-02 8.6270e-03 -2.1170e-03 -4.0370e-03 2.2900e-04"/>
+                <joint name="panda_joint5" type="hinge" axis="0 0 1" 
+                       range="-2.8973 2.8973" damping="0.1023" frictionloss="0.2669"/>
                 <geom type="mesh" mesh="link5" material="panda_white"/>
                 
                 <body name="panda_link6" pos="0 0 0" quat="0.7071068 0.7071068 0 0">
-                  <joint name="panda_joint6" type="hinge" axis="0 0 1" range="-0.0175 3.7525"/>
+                  <inertial pos="6.0149e-02 -1.4117e-02 -1.0517e-02" mass="1.666555" 
+                            fullinertia="1.9640e-03 4.3540e-03 5.4330e-03 1.0900e-04 -1.1580e-03 3.4100e-04"/>
+                  <joint name="panda_joint6" type="hinge" axis="0 0 1" 
+                         range="-0.0175 3.7525" damping="0.0132" frictionloss="0.1658"/>
                   <geom type="mesh" mesh="link6" material="panda_white"/>
                   
                   <body name="panda_link7" pos="0.088 0 0" quat="0.7071068 0.7071068 0 0">
-                    <joint name="panda_joint7" type="hinge" axis="0 0 1" range="-2.8973 2.8973"/>
+                    <inertial pos="1.0517e-02 -4.252e-03 6.1597e-02" mass="0.735522" 
+                              fullinertia="1.2516e-02 1.0027e-02 4.8150e-03 -4.2800e-04 -1.1960e-03 -7.4100e-04"/>
+                    <joint name="panda_joint7" type="hinge" axis="0 0 1" 
+                           range="-2.8973 2.8973" damping="0.0638" frictionloss="1.2109"/>
                     <geom type="mesh" mesh="link7" material="panda_white"/>
                     
-                    <!-- End Effector -->
-                    <body name="panda_EndEffector" pos="0 0 0.107" quat="0.9238795 0 0 0.3826834">
+                    <body name="panda_EndEffector" pos="0 0 0.107" quat="0.92106099 0 0 0.38941834">
+                      <inertial pos="0 0 0" mass="0.01" diaginertia="1e-6 1e-6 1e-6"/>
                       
-                      <!-- Add site here for torque sensor -->
-                      <site name="ee_site" pos="0 0 0" size="0.001" rgba="1 0 0 0"/>
-
-                      <!-- Tray attached to end effector -->
-                      <body name="tray_base" pos="0 0 0.09" quat="0.7071068 0 0.7071068 0">
-
-                        <site name="tray_site" pos="0 0 0" size="0.001" rgba="0 1 0 1"/>
+                      <!-- TRAY: now connected to the end effector via a BALL joint -->
+                      <body name="tray_frame" pos="0 0 0.09" quat="0.7071068 0 0.7071068 0">
+                        <!-- ball joint between end-effector and tray_frame -->
+                        <joint name="tray_ball" type="ball" damping="100" stiffness="1000" limited="false"/>
                         
-                        <!-- Tray base -->
-                        <geom name="tray_base_geom" type="box" size="0.08 0.12 0.005" material="tray_black"/>
+                        <!-- keep a small inertial node on the frame; main mass on tray_base -->
+                        <inertial pos="0 0 0" mass="0.001" diaginertia="1e-6 1e-6 1e-6"/>
                         
-                        <!-- Tray rims -->
-                        <geom name="tray_rim_xpos" type="box" size="0.01 0.12 0.005" pos="0.08 0 0.01" material="tray_rim"/>
-                        <geom name="tray_rim_xneg" type="box" size="0.01 0.12 0.005" pos="-0.08 0 0.01" material="tray_rim"/>
-                        <geom name="tray_rim_ypos" type="box" size="0.08 0.01 0.005" pos="0 0.12 0.01" material="tray_rim"/>
-                        <geom name="tray_rim_yneg" type="box" size="0.08 0.01 0.005" pos="0 -0.12 0.01" material="tray_rim"/>
-                      </body>
-                    </body>
+                        <body name="tray_base" pos="0 0 0" quat="1 0 0 0">
+                          <inertial pos="0 0 0" mass="0.5" diaginertia="0.002 0.0015 0.001"/>
+                          
+                          <!-- Geoms now have no mass; dynamics come from tray_base inertial -->
+                          <geom name="tray_base_geom" type="box" size="0.08 0.12 0.005" 
+                                material="tray_black" friction="0.4 0.01 0.0001"/>
+                          <geom name="tray_rim_xpos" type="box" size="0.01 0.12 0.005" pos="0.08 0 0.01" 
+                                material="tray_rim" friction="0.6 0.01 0.0001"/>
+                          <geom name="tray_rim_xneg" type="box" size="0.01 0.12 0.005" pos="-0.08 0 0.01" 
+                                material="tray_rim" friction="0.6 0.01 0.0001"/>
+                          <geom name="tray_rim_ypos" type="box" size="0.08 0.01 0.005" pos="0 0.12 0.01" 
+                                material="tray_rim" friction="0.6 0.01 0.0001"/>
+                          <geom name="tray_rim_yneg" type="box" size="0.08 0.01 0.005" pos="0 -0.12 0.01" 
+                                material="tray_rim" friction="0.6 0.01 0.0001"/>
+                        </body> <!-- tray_base -->
+                      </body> <!-- tray_frame -->
+                    </body> <!-- panda_EndEffector -->
                   </body>
                 </body>
               </body>
@@ -92,28 +118,29 @@
       </body>
     </body>
 
-    <!-- Cylinder object -->
-    <body name="cylinder" pos="0.5 0.3 0.68">
+    <body name="cylinder" pos="0.788 0.108 0.655">
       <freejoint name="cylinder_free"/>
-      <geom name="cylinder_geom" type="cylinder" size="0.02 0.03" material="ball_red"/>
+      <geom name="cylinder_geom" type="cylinder" size="0.02 0.03"
+            mass="0.2" friction="0.6 0.005 0.0001" material="ball_red"/>
     </body>
 
-    <!-- Ground plane -->
     <geom name="ground" type="plane" size="2 2 0.1" pos="0 0 0" material="environment"/>
   </worldbody>
 
   <actuator>
-    <motor name="panda_joint1_motor" joint="panda_joint1" gear="87"/>
-    <motor name="panda_joint2_motor" joint="panda_joint2" gear="87"/>
-    <motor name="panda_joint3_motor" joint="panda_joint3" gear="87"/>
-    <motor name="panda_joint4_motor" joint="panda_joint4" gear="87"/>
-    <motor name="panda_joint5_motor" joint="panda_joint5" gear="12"/>
-    <motor name="panda_joint6_motor" joint="panda_joint6" gear="12"/>
-    <motor name="panda_joint7_motor" joint="panda_joint7" gear="12"/>
+    <motor name="panda_joint1" joint="panda_joint1" gear="1"
+           ctrllimited="true" ctrlrange="-87 87" forcelimited="true" forcerange="-87 87"/>
+    <motor name="panda_joint2" joint="panda_joint2" gear="1"
+           ctrllimited="true" ctrlrange="-87 87" forcelimited="true" forcerange="-87 87"/>
+    <motor name="panda_joint3" joint="panda_joint3" gear="1"
+           ctrllimited="true" ctrlrange="-87 87" forcelimited="true" forcerange="-87 87"/>
+    <motor name="panda_joint4" joint="panda_joint4" gear="1"
+           ctrllimited="true" ctrlrange="-87 87" forcelimited="true" forcerange="-87 87"/>
+    <motor name="panda_joint5" joint="panda_joint5" gear="1"
+           ctrllimited="true" ctrlrange="-12 12" forcelimited="true" forcerange="-12 12"/>
+    <motor name="panda_joint6" joint="panda_joint6" gear="1"
+           ctrllimited="true" ctrlrange="-12 12" forcelimited="true" forcerange="-12 12"/>
+    <motor name="panda_joint7" joint="panda_joint7" gear="1"
+           ctrllimited="true" ctrlrange="-12 12" forcelimited="true" forcerange="-12 12"/>
   </actuator>
-
-  <sensor>
-    <torque name="ee_torque" site="ee_site"/>
-  </sensor>
-
 </mujoco>

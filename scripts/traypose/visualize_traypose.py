@@ -53,6 +53,8 @@ def print_space_info(env):
     print(f"  [26:30] Goal pose (XYZ + yaw, 4D)")
     print(f"  [30:32]   Cylinder XY in tray frame (2D)")
     print(f"  [32:34] Cylinder velocity XY in tray frame (2D)")
+    print(f"  [34:35] Cylinder tilt angle in tray frame (1D)")
+    print(f"  [35:36] Cylinder tilt velocity in tray frame (1D)")
     print(f"{'='*60}\n")
 
 def print_observation_details(obs, step=0):
@@ -67,6 +69,8 @@ def print_observation_details(obs, step=0):
     print(f"Goal pose:           {obs[26:30]}")
     print(f"Cylinder XY (tray):  {obs[30:32]}")
     print(f"Cylinder vel XY:     {obs[32:34]}")
+    print(f"Cylinder angle (tray):  {obs[34:35]}")
+    print(f"Cylinder vel angle:     {obs[35:36]}")
 
 def run_zero_action_mode(env, viewer, episode, pause_seconds=3.0):
     """Mode 1: Zero action - arm stays at start pose"""
@@ -95,11 +99,14 @@ def run_zero_action_mode(env, viewer, episode, pause_seconds=3.0):
             tray_pos = env.tray_pos
             cyl_xy_tray = obs[30:32]
             cyl_vel_tray = obs[32:34]
+
             print(f"  t={step*env.control_dt:.1f}s | Reward: {reward:.3f}")
             print(f"    Tray pos: {tray_pos}")
             print(f"    Cylinder world: {cylinder_pos}")
             print(f"    Cylinder XY (tray frame): {cyl_xy_tray}")
             print(f"    Cylinder vel XY (tray frame): {cyl_vel_tray}")
+            print(f"    Cylinder angle (tray): {obs[34:35]}")
+            print(f"    Cylinder vel angle: {obs[35:36]}")
             print(f"    Terminated: {terminated}, Truncated: {truncated}, HoldCounter: {info.get('goal_hold_counter')}")
         
         viewer.sync()
@@ -139,6 +146,8 @@ def run_random_action_mode(env, viewer, episode, max_steps=500):
             tray_pos = env.tray_pos
             cyl_xy_tray = obs[30:32]
             cyl_vel_tray = obs[32:34]
+            tilt_angle = obs[34:35]
+            tilt_velocity = obs[35:36]
             joint_pos = obs[0:7]
             joint_vel = obs[7:14]
             print(f"\n  Step {step_count}")
@@ -148,6 +157,8 @@ def run_random_action_mode(env, viewer, episode, max_steps=500):
             print(f"    Cylinder world pos: {cylinder_pos}")
             print(f"    Cylinder XY (tray frame): {cyl_xy_tray}")
             print(f"    Cylinder vel XY (tray frame): {cyl_vel_tray}")
+            print(f"    Cylinder tilt angle: {tilt_angle}")
+            print(f"    Cylinder tilt angle: {tilt_velocity}")
             print(f"    Joint pos: {joint_pos}")    
             print(f"    Joint vel: {joint_vel}")   
             print(f"    Terminated: {terminated}, Truncated: {truncated}, HoldCounter: {info.get('goal_hold_counter')}")
@@ -187,6 +198,8 @@ def run_seeded_action_mode(env, viewer, episode, max_steps=500, seed=123):
             tray_pos = env.tray_pos
             cyl_xy_tray = obs[30:32]
             cyl_vel_tray = obs[32:34]
+            tilt_angle = obs[34:35]
+            tilt_velocity = obs[35:36]
             joint_pos = obs[0:7]
             joint_vel = obs[7:14]
             print(f"\n  Step {step_count}")
@@ -196,6 +209,8 @@ def run_seeded_action_mode(env, viewer, episode, max_steps=500, seed=123):
             print(f"    Cylinder world pos: {cylinder_pos}")
             print(f"    Cylinder XY (tray frame): {cyl_xy_tray}")
             print(f"    Cylinder vel XY (tray frame): {cyl_vel_tray}")
+            print(f"    Cylinder tilt angle: {tilt_angle}")
+            print(f"    Cylinder tilt angle: {tilt_velocity}")
             print(f"    Joint pos: {joint_pos}")
             print(f"    Joint vel: {joint_vel}")
             print(f"    Terminated: {terminated}, Truncated: {truncated}, HoldCounter: {info.get('goal_hold_counter')}")

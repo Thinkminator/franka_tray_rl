@@ -87,8 +87,8 @@ class TrayPoseEnv(gym.Env):
 
         self.np_random = np.random.RandomState()
 
-        # Observation: 34 dims (added cylinder planar velocity 2D)
-        obs_dim = 34
+        # Observation: 36 dims (we include cylinder angle & angular rate)
+        obs_dim = 36
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
 
         # START configuration
@@ -189,6 +189,9 @@ class TrayPoseEnv(gym.Env):
         self.prev_joint_pos_noisy = None
         self.prev_joint_vel_noisy = None
 
+        # For cylinder angle rate estimation
+        self.prev_cyl_angle = None
+
         print(f"\n{'='*60}")
         print(f"TrayPoseEnv initialized with JOINT-SPACE TORQUE CONTROL")
         print(f"  Model: {self.model_path}")
@@ -200,7 +203,7 @@ class TrayPoseEnv(gym.Env):
         print(f"  Sticky q_des: enabled (zero action holds last target)")
         print(f"  Observation noise: pos_std={self.obs_noise_std_pos:.4f} rad, vel_std={self.obs_noise_std_vel:.4f} rad/s")
         print(f"  Tray obs mode: {'Jacobian FK' if self.use_jacobian_tray_obs else 'Direct MuJoCo'}")
-        print(f"  Observation space: 34D (includes cylinder xy velocity in tray frame)")
+        print(f"  Observation space: 36D (includes cylinder angle & angular rate)")
         print(f"  Success criteria: hold goal for {self.success_hold_H} steps")
         print(f"  Goal tolerances: pos={self.goal_pos_tolerance}m, yaw={self.goal_yaw_tolerance*180/np.pi:.1f}°")
         print(f"  Max episode steps: {self.max_steps}")
@@ -382,6 +385,7 @@ class TrayPoseEnv(gym.Env):
         self._prev_cyl_pos = None
         self.prev_joint_pos_noisy = None
         self.prev_joint_vel_noisy = None
+        self.prev_cyl_angle = None
 
         return self._get_obs(), {}
 
@@ -482,12 +486,46 @@ class TrayPoseEnv(gym.Env):
         if not terminated and self.t >= self.max_steps:
             truncated = True
 
+        # Build info (angle fields are filled in _get_obs, but we also compute here for clarity)
+        # Recompute angle & rate for info to ensure consistency:
+        cyl_angle = 0.0
+        cyl_angle_rate = 0.0
+        try:
+            # compute cylinder z-axis in world
+            if self.cylinder_type == mujoco.mjtJoint.mjJNT_FREE:
+                cyl_quat = self.data.qpos[self.cylinder_qposadr+3:self.cylinder_qposadr+7]
+                cyl_rot = R.from_quat([cyl_quat[1], cyl_quat[2], cyl_quat[3], cyl_quat[0]])
+                z_cyl = cyl_rot.apply([0, 0, 1])
+            else:
+                z_cyl = np.array([0.0, 0.0, 1.0])
+
+            # tray z-axis in world
+            tray_quat = self.data.xquat[self.tray_body_id].copy()  # [w,x,y,z]
+            tray_quat_xyzw = [tray_quat[1], tray_quat[2], tray_quat[3], tray_quat[0]]
+            R_tray = R.from_quat(tray_quat_xyzw)
+            z_tray = R_tray.apply([0, 0, 1])
+
+            dot = float(np.clip(np.dot(z_cyl, z_tray), -1.0, 1.0))
+            cyl_angle = float(np.arccos(dot))
+
+            if self.prev_cyl_angle is None:
+                cyl_angle_rate = 0.0
+            else:
+                # wrap angle diff to [-pi, pi]
+                delta = (cyl_angle - self.prev_cyl_angle + np.pi) % (2 * np.pi) - np.pi
+                cyl_angle_rate = float(delta / self.control_dt)
+        except Exception:
+            cyl_angle = 0.0
+            cyl_angle_rate = 0.0
+
         info = {
             'goal_hold_counter': self.goal_hold_counter,
             'at_goal': at_goal_now,
             'pos_err': pos_err,
             'yaw_err': yaw_err,
-            'cylinder_offset': np.linalg.norm(rel_cyl_xy_world) if not terminated else 0.0
+            'cylinder_offset': np.linalg.norm(rel_cyl_xy_world) if not terminated else 0.0,
+            'cylinder_angle': cyl_angle,
+            'cylinder_angle_rate': cyl_angle_rate
         }
         return obs, float(reward), bool(terminated), bool(truncated), info
 
@@ -583,11 +621,12 @@ class TrayPoseEnv(gym.Env):
 
     def _get_obs(self):
         """
-        Observation vector (34D) in this sequence:
+        Observation vector (36D) in this sequence:
         1) Robot state: q(7), dq(7)
         2) Tray pose/dynamics: [x,y,z, r,p,y, vx,vy,vz, wx,wy,wz]
         3) Goal: [gx, gy, gz, gyaw]
         4) Cylinder in tray frame: [x,y, xdot,ydot]
+        5) Cylinder extras: [angle_between_z, angle_rate]
         """
         current_tray_pos, tray_rpy, tray_linear_velocity, tray_angular_velocity = \
             self._get_tray_pose_velocity(use_noisy_joints=True)
@@ -614,10 +653,42 @@ class TrayPoseEnv(gym.Env):
         if self.cylinder_noise_std_vel > 0.0:
             cyl_vxy_in_tray += self.np_random.normal(0.0, self.cylinder_noise_std_vel, size=2)
 
+        # compute cylinder-to-tray Z-axis angle and its finite-difference rate
+        cyl_angle = 0.0
+        cyl_angle_rate = 0.0
+        try:
+            if self.cylinder_type == mujoco.mjtJoint.mjJNT_FREE:
+                cyl_quat = self.data.qpos[self.cylinder_qposadr+3:self.cylinder_qposadr+7]  # [w,x,y,z]
+                cyl_rot = R.from_quat([cyl_quat[1], cyl_quat[2], cyl_quat[3], cyl_quat[0]])
+                z_cyl_w = cyl_rot.apply([0, 0, 1])
+            else:
+                z_cyl_w = np.array([0.0, 0.0, 1.0])
+
+            # tray z axis in world
+            tray_rot = R.from_quat(tray_quat_xyzw)
+            z_tray_w = tray_rot.apply([0, 0, 1])
+
+            dot = float(np.clip(np.dot(z_cyl_w, z_tray_w), -1.0, 1.0))
+            cyl_angle = float(np.arccos(dot))
+
+            if self.prev_cyl_angle is None:
+                cyl_angle_rate = 0.0
+            else:
+                # wrap diff to [-pi, pi]
+                delta = (cyl_angle - self.prev_cyl_angle + np.pi) % (2 * np.pi) - np.pi
+                cyl_angle_rate = float(delta / self.control_dt)
+        except Exception:
+            cyl_angle = 0.0
+            cyl_angle_rate = 0.0
+
+        # update stored previous angle for next finite-diff
+        self.prev_cyl_angle = float(cyl_angle)
+
         joint_angles = self._get_arm_qpos(noisy=True)
         joint_velocities = self._get_arm_qvel(noisy=True)
 
         goal_pose = np.concatenate([self.goal_tray_pos, np.array([self.goal_tray_rpy[2]])])
+        tilt = np.array([cyl_angle, cyl_angle_rate]) 
 
         return np.concatenate([
             joint_angles,                # 7
@@ -628,7 +699,8 @@ class TrayPoseEnv(gym.Env):
             tray_angular_velocity,       # 3
             goal_pose,                   # 4
             cyl_xy_in_tray,              # 2
-            cyl_vxy_in_tray              # 2
+            cyl_vxy_in_tray,             # 2
+            tilt                         # 2
         ]).astype(np.float32)
 
     def render(self, mode="human"):

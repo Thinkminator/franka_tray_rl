@@ -130,9 +130,15 @@ Info keys:
   - Applies random actions from a fixed seed; logs state every 50 steps 
 
 Selecting mode:
-- python scripts/traypose/visualize_traypose.py zero
-- python scripts/traypose/visualize_traypose.py random
-- python scripts/traypose/visualize_traypose.py seeded
+```python
+python scripts/traypose/visualize_traypose.py zero
+```
+```python
+python scripts/traypose/visualize_traypose.py random
+```
+```python
+python scripts/traypose/visualize_traypose.py seeded
+```
 
 Viewer:
 - Uses mujoco.viewer.launch_passive to render in real time
@@ -158,8 +164,8 @@ Constructor overrides:
 env = TrayPoseEnv(
     obs_noise_std_pos=0.005,
     obs_noise_std_vel=0.05,
-    use_jacobian_tray_obs=True
-    cylinder_noise_std_pos: 0.005
+    use_jacobian_tray_obs=True,
+    cylinder_noise_std_pos: 0.005,
     cylinder_noise_std_vel: 0.01
 )
 ```
