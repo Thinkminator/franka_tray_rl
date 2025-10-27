@@ -23,7 +23,8 @@ class TrayPoseEnv(gym.Env):
                  cylinder_noise_std_pos=None,
                  cylinder_noise_std_vel=None,
                  use_jacobian_tray_obs=False,
-                 config_path="config.yaml"):
+                 config_path="config.yaml",
+                 render=False):
         """
         Args:
             model_path: Path to MuJoCo XML model (overrides YAML if provided)
@@ -34,8 +35,10 @@ class TrayPoseEnv(gym.Env):
             cylinder_noise_std_vel: Std dev of Gaussian noise for cylinder velocities (m/s) (overrides YAML)
             use_jacobian_tray_obs: If True, compute tray pose/vel via Jacobian FK (overrides YAML)
             config_path: Path to YAML config with defaults
+            render: Show visualization in MuJuCo
         """
         super().__init__()
+        self.render_mode = render
 
         # Load YAML config if present
         cfg = {}
@@ -632,8 +635,9 @@ class TrayPoseEnv(gym.Env):
         ]).astype(np.float32)
 
     def render(self, mode="human"):
-        cylinder_state = self._get_cylinder_xyz()
-        print(f"Step {self.t}: Tray {self.tray_pos}, Cylinder {cylinder_state}")
+        if self.render_mode:
+            cylinder_state = self._get_cylinder_xyz()
+            print(f"Step {self.t}: Tray {self.tray_pos}, Cylinder {cylinder_state}")
 
     def close(self):
         pass

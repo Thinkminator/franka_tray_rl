@@ -230,25 +230,25 @@ def main():
     print(f"{'='*60}")
     
     # Initialize environment with joint-space torque PD + gravity compensation
-    # env = TrayPoseEnv()
+    # env = TrayPoseEnv(render=True)
     
     # Light noise (realistic sensor noise)
-    # env = TrayPoseEnv(obs_noise_std_pos=0.001, obs_noise_std_vel=0.01)  # ~0.06° pos, 0.57°/s vel
+    # env = TrayPoseEnv(obs_noise_std_pos=0.001, obs_noise_std_vel=0.01, render=True)  # ~0.06° pos, 0.57°/s vel
 
     # Moderate noise
-    # env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05)  # ~0.29° pos, 2.86°/s vel
+    # env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05, render=True)  # ~0.29° pos, 2.86°/s vel
 
     # Heavy noise (stress test)
-    # env = TrayPoseEnv(obs_noise_std_pos=0.01, obs_noise_std_vel=0.1)    # ~0.57° pos, 5.73°/s vel
+    # env = TrayPoseEnv(obs_noise_std_pos=0.01, obs_noise_std_vel=0.1, render=True)    # ~0.57° pos, 5.73°/s vel
 
     # Noisy cylinder info
-    # env = TrayPoseEnv(config_path="config.yaml", cylinder_noise_std_pos=0.005, cylinder_noise_std_vel=0.01)
+    # env = TrayPoseEnv(config_path="config.yaml", cylinder_noise_std_pos=0.005, cylinder_noise_std_vel=0.01, render=True)
 
     # Jacobian FK with noisy joints → noisy tray obs
-    # env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05, use_jacobian_tray_obs=True)
+    # env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05, use_jacobian_tray_obs=True, render=True)
 
     # I feel good ~~
-    env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05, cylinder_noise_std_pos=0.005, cylinder_noise_std_vel=0.01, use_jacobian_tray_obs=True)
+    env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05, cylinder_noise_std_pos=0.005, cylinder_noise_std_vel=0.01, use_jacobian_tray_obs=True, render=True)
 
     # Print space info
     print_space_info(env)
