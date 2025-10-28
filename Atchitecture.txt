@@ -1,5 +1,0 @@
-obs (34)
-   └─> Trunk: Linear(34→128) + Tanh → Linear(128→128) + Tanh
-         ├─> Actor head: Linear(128→7) → (μ) ─┐
-         │                                     ├─ tanh(μ + ε·σ) → action ∈ [-1,1]^7
-         └─> Critic head: Linear(128→1) → V    └─ σ = exp(log_std) (learnable, 7 params)
