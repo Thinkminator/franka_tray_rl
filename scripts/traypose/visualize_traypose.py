@@ -257,7 +257,7 @@ def main():
     # env = TrayPoseEnv(obs_noise_std_pos=0.01, obs_noise_std_vel=0.1)    # ~0.57° pos, 5.73°/s vel
 
     # Noisy cylinder info
-    # env = TrayPoseEnv(config_path="config.yaml", cylinder_noise_std_pos=0.005, cylinder_noise_std_vel=0.01)
+    # env = TrayPoseEnv(config_path="envs/traypose/config.yaml", cylinder_noise_std_pos=0.005, cylinder_noise_std_vel=0.01)
 
     # Jacobian FK with noisy joints → noisy tray obs
     # env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05, use_jacobian_tray_obs=True)

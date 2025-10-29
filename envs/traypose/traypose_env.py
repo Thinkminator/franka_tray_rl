@@ -23,7 +23,7 @@ class TrayPoseEnv(gym.Env):
                  cylinder_noise_std_pos=None,
                  cylinder_noise_std_vel=None,
                  use_jacobian_tray_obs=False,
-                 config_path="config.yaml"):
+                 config_path="envs/traypose/config.yaml"):
         """
         Args:
             model_path: Path to MuJoCo XML model (overrides YAML if provided)
@@ -42,6 +42,10 @@ class TrayPoseEnv(gym.Env):
         if config_path and os.path.isfile(config_path):
             with open(config_path, "r") as f:
                 cfg = yaml.safe_load(f) or {}
+            print(f"Loaded config from {config_path}:")
+        
+        else:
+            print(f"Config file {config_path} not found or not loaded.")
 
         def get(path, default):
             cur = cfg
@@ -51,6 +55,7 @@ class TrayPoseEnv(gym.Env):
                 return default if cur is None else cur
             except Exception:
                 return default
+
 
         # Model path and load MuJoCo model
         self.model_path = model_path or get("model_path", "assets/panda_tray/panda_tray_cylinder.xml")
@@ -166,11 +171,21 @@ class TrayPoseEnv(gym.Env):
         self.penalty_rim    = float(get("penalties.rim", -0.5))
         self.penalty_drop   = float(get("penalties.drop", -10.0))
         self.penalty_topple = float(get("penalties.topple", -5.0))
+        self.slide_penalty_min = float(get("penalties.slide_penalty_min", -0.1))
+        self.slide_penalty_max = float(get("penalties.slide_penalty_max", -0.5))
+        self.slant_penalty_min = float(get("penalties.slant_penalty_min", -0.1))
+        self.slant_penalty_max = float(get("penalties.slant_penalty_max", -0.5))
+        self.progress_k = float(get("penalties.progress_k", 5.0))
+        self.progress_max = float(get("penalties.progress_max", 0.5))
+        
+        self.rim_x_half = float(get("rim_zone.x_half", 0.05))
+        self.rim_y_half = float(get("rim_zone.y_half", 0.09))
+        self.slide_threshold = float(get("rim_zone.slide_threshold", 0.01))
 
-        self.rim_x_min = float(get("rim_zone.x_min", -0.05))
-        self.rim_x_max = float(get("rim_zone.x_max",  0.05))
-        self.rim_y_min = float(get("rim_zone.y_min", -0.09))
-        self.rim_y_max = float(get("rim_zone.y_max",  0.09))
+        self.slant_angle_min = float(get("slant_angle.slant_angle_min", 10))
+        self.slant_angle_max = float(get("slant_angle.slant_angle_max", 90))
+
+        self.min_delta = float(get("progress.min_delta", 1e-4))
 
         self.drop_center_margin = float(get("drop_check.center_to_center_margin", 0.09))
 
@@ -387,6 +402,9 @@ class TrayPoseEnv(gym.Env):
         self.prev_joint_vel_noisy = None
         self.prev_cyl_angle = None
 
+        # Initialize previous goal distance for progress reward
+        self.prev_goal_dist = float(np.linalg.norm(self.start_tray_pos - self.goal_tray_pos))
+
         return self._get_obs(), {}
 
     def _compute_torque_control(self):
@@ -451,19 +469,67 @@ class TrayPoseEnv(gym.Env):
         if action_mag <= 1e-3:
             reward += self.penalty_idle
 
-        # Rim penalty (uses world XY relative to tray center)
+        # --- Progress reward (distance-proportional, per-step) ---
+        current_goal_dist = float(np.linalg.norm(self.tray_pos - self.goal_tray_pos))
+        delta_goal = self.prev_goal_dist - current_goal_dist  # positive if closer
+
+        if delta_goal > self.min_delta:
+            progress_reward = np.clip(self.progress_k * delta_goal, 0.0, self.progress_max)
+            reward += progress_reward
+
+        # Update previous goal distance
+        self.prev_goal_dist = current_goal_dist
+
+        # Continuous sliding penalty based on distance of cylinder from center to rim
         rel_cyl_xy_world = cyl_pos_w[:2] - self.tray_pos[:2]
-        if (rel_cyl_xy_world[0] <= self.rim_x_min or rel_cyl_xy_world[0] >= self.rim_x_max or
-            rel_cyl_xy_world[1] <= self.rim_y_min or rel_cyl_xy_world[1] >= self.rim_y_max):
-            reward += self.penalty_rim
+        distance = np.linalg.norm(rel_cyl_xy_world)
+
+        rim_x_half = self.rim_x_half  
+        rim_y_half = self.rim_y_half
+        rim_diagonal = np.sqrt(rim_x_half**2 + rim_y_half**2)
+
+        if distance <= rim_diagonal and distance >= self.slide_threshold:
+            # Clamp distance to the interpolation range
+            sliding_penalty = np.interp(distance,
+                    [self.slide_threshold, rim_diagonal],
+                    [self.slide_penalty_min, self.slide_penalty_max])
+            reward += sliding_penalty
+
+        # Continous slanting penalty based on angle of tray
+        slant_angle_min_rad = np.deg2rad(self.slant_angle_min)
+        slant_angle_max_rad = np.deg2rad(self.slant_angle_max)
+        roll_abs = abs(self.tray_rpy[0])
+        pitch_abs = abs(self.tray_rpy[1])
+
+        # Interpolate roll penalty
+        if roll_abs >= slant_angle_min_rad:
+            roll_penalty = np.interp(
+                roll_abs,
+                [slant_angle_min_rad, slant_angle_max_rad],
+                [self.slant_penalty_min, self.slant_penalty_max]
+            )
+            reward += roll_penalty
+
+        # Interpolate pitch penalty
+        if pitch_abs >= slant_angle_min_rad:
+            pitch_penalty = np.interp(
+                pitch_abs,
+                [slant_angle_min_rad, slant_angle_max_rad],
+                [self.slant_penalty_min, self.slant_penalty_max]
+            )
+            reward += pitch_penalty
 
         terminated = False
         truncated = False
+
+        drop_terminated = False
+        topple_terminated = False
 
         # Drop termination (large penalty)
         if cyl_pos_w[2] < (self.tray_pos[2] - self.drop_center_margin):
             reward += self.penalty_drop
             terminated = True
+            drop_terminated = True
 
         # Topple termination (medium penalty)
         if not terminated and self.cylinder_type == mujoco.mjtJoint.mjJNT_FREE:
@@ -474,6 +540,7 @@ class TrayPoseEnv(gym.Env):
             if angle_from_upright > (np.pi / 4):  # > 45 deg from upright
                 reward += self.penalty_topple
                 terminated = True
+                topple_terminated = True
 
         # Success check: if held goal for H steps, grant final positive reward
         if not terminated and self.goal_hold_counter >= self.success_hold_H:
@@ -525,7 +592,9 @@ class TrayPoseEnv(gym.Env):
             'yaw_err': yaw_err,
             'cylinder_offset': np.linalg.norm(rel_cyl_xy_world) if not terminated else 0.0,
             'cylinder_angle': cyl_angle,
-            'cylinder_angle_rate': cyl_angle_rate
+            'cylinder_angle_rate': cyl_angle_rate,
+            'terminated_due_to_drop': drop_terminated,
+            'terminated_due_to_topple': topple_terminated
         }
         return obs, float(reward), bool(terminated), bool(truncated), info
 

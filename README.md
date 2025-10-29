@@ -80,7 +80,14 @@ A MuJoCo viewer will open showing the Panda arm holding the tray.
 A red cylinder will spawn above the tray.
 Random actions will move the tray.
 
-🧠 Next Steps (RL Training)
+## 🧠 Training a model
+
+Train a model by running:
+
+    python scripts/traypose/train_traypose.py
+
+
+## 🧠 Next Steps (RL Training)
 
 You can plug TrayPoseEnv into RL libraries like Stable-Baselines3 or RLlib.
 

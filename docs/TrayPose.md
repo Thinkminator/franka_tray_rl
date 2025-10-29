@@ -90,8 +90,10 @@ Autotuning (optional):
 Base and penalties (all configurable):
 - Step penalty: penalties.base_step (e.g., −0.1)
 - Idle penalty if small action: penalties.idle_action (e.g., −0.4)
-- Rim penalty if cylinder XY exceeds tray-frame bounds: penalties.rim
-  - rim_zone.x_min/x_max, y_min/y_max define tray-frame bounds after margins
+- Sliding penalty: if cylinder XY slides more than slide_threshold, a negative penalty that is proportional to the distance will be given
+- Slanting penalty: if cylinder XY slants more than slant_angle_min, a negative penalty that is proportional to the angle will be given
+- Progress reward: if the current distance between tray and goal pose is smaller than previous one, a reward that is proportional to the substraction will be given
+
 
 Termination penalties:
 - Drop: if cylinder z < tray_z − drop_margin → add penalties.drop and terminate
@@ -153,8 +155,10 @@ Key blocks:
 - goal: tray_pos, tray_rpy, pos_tolerance, yaw_tolerance_deg, success_hold_steps, max_steps
 - pd_gains: Kq, Dq
 - limits: joint_low, joint_high
-- penalties: base_step, idle_action, rim, drop, topple
-- rim_zone: x/y bounds in tray frame
+- penalties: base_step, idle_action, rim, drop, topple, lide_penalty_min, slide_penalty_max, slant_penalty_min, slant_penalty_max, progress_k, progress_max
+- progress: min_delta
+- rim_zone: x/y bounds in tray frame, slide_threshold
+- slant_angle: slant_angle_min/max
 - drop_check: center_to_center_margin
 - success_reward: alpha, max_bonus
 

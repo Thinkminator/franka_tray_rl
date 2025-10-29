@@ -21,7 +21,7 @@ from envs.traypose.traypose_env import TrayPoseEnv
 
 
 def make_env_fn(model_path="assets/panda_tray/panda_tray_cylinder.xml",
-                config_path="config.yaml",
+                config_path="envs/traypose/config.yaml",
                 obs_noise_std_pos=0.0,
                 obs_noise_std_vel=0.0,
                 use_jacobian_tray_obs=False):
@@ -103,12 +103,10 @@ class CustomEvalCallback(BaseCallback):
         return None
 
     def _on_step(self) -> bool:
-        # run only every eval_freq timesteps
         if (self.num_timesteps - self._last_eval_step) < self.eval_freq:
             return True
         self._last_eval_step = self.num_timesteps
 
-        # Try to infer success_hold_H from the underlying env if not given
         inferred_success_H = self.success_hold_H
         if inferred_success_H is None:
             base_env = self._unwrap_base_env()
@@ -125,8 +123,13 @@ class CustomEvalCallback(BaseCallback):
         angle_means = []
         angle_rate_means = []
 
+        terminated_count = 0
+        truncated_count = 0
+        success_count = 0
+        drop_terminated_count = 0
+        topple_terminated_count = 0
+
         for _ in range(self.n_eval_episodes):
-            # robust reset
             res = self.eval_env.reset()
             if isinstance(res, tuple) and len(res) == 2:
                 obs, info = res
@@ -137,35 +140,53 @@ class CustomEvalCallback(BaseCallback):
             ep_rew = 0.0
             ep_len = 0
             ep_success = False
+            ep_terminated = False
+            ep_truncated = False
+            ep_drop_terminated = False
+            ep_topple_terminated = False
 
-            # per-episode lists for cylinder angle metrics (if provided by env via info)
             angles = []
             angle_rates = []
 
             while True:
-                # model.predict expects the same obs shape as training; for VecEnvs the callback uses single env so obs is unwrapped already
                 action, _ = self.model.predict(obs, deterministic=True)
                 step_res = self.eval_env.step(action)
 
-                # Gymnasium function-style non-vector: (obs, reward, terminated, truncated, info)
                 if isinstance(step_res, tuple) and len(step_res) == 5:
                     obs, reward, terminated, truncated, info = step_res
+                    # Unwrap lists if vectorized env returns batches
+                    if isinstance(info, (list, tuple)):
+                        info = info[0]
+                    if isinstance(terminated, (list, tuple, np.ndarray)):
+                        terminated = terminated[0]
+                    if isinstance(truncated, (list, tuple, np.ndarray)):
+                        truncated = truncated[0]
+                    if isinstance(reward, (list, tuple, np.ndarray)):
+                        reward = reward[0]
                     done = bool(terminated or truncated)
-                # Gym classic: (obs, reward, done, info)
+
                 elif isinstance(step_res, tuple) and len(step_res) == 4:
                     obs, reward, done, info = step_res
+                    # Unwrap lists if vectorized env returns batches
+                    if isinstance(info, (list, tuple)):
+                        info = info[0]
+                    if isinstance(reward, (list, tuple, np.ndarray)):
+                        reward = reward[0]
                     done = bool(done)
+                    terminated = done
+                    truncated = False
+
                 else:
-                    # vecenv-like: obs, rewards, dones, infos
                     obs, rewards_arr, dones_arr, infos_arr = step_res
                     reward = float(rewards_arr[0]) if hasattr(rewards_arr, "__len__") else float(rewards_arr)
                     done = bool(dones_arr[0]) if hasattr(dones_arr, "__len__") else bool(dones_arr)
                     info = infos_arr[0] if hasattr(infos_arr, "__len__") else infos_arr
+                    terminated = done
+                    truncated = False
 
                 ep_rew += float(reward)
                 ep_len += 1
 
-                # collect cylinder angle info (if present)
                 if isinstance(info, dict):
                     if "cylinder_angle" in info:
                         try:
@@ -178,7 +199,6 @@ class CustomEvalCallback(BaseCallback):
                         except Exception:
                             pass
 
-                    # detect success flag if provided by env
                     if "is_success" in info:
                         ep_success = ep_success or bool(info["is_success"])
                     elif "success" in info:
@@ -192,13 +212,28 @@ class CustomEvalCallback(BaseCallback):
                         ep_success = ep_success or bool(info["at_goal"])
 
                 if done or ep_len > 10000:
+                    ep_terminated = bool(terminated)
+                    ep_truncated = bool(truncated)
+                    # Now safe to use .get() on info dict
+                    ep_drop_terminated = bool(info.get('terminated_due_to_drop', False))
+                    ep_topple_terminated = bool(info.get('terminated_due_to_topple', False))
                     break
 
             rewards.append(ep_rew)
             lengths.append(ep_len)
             successes.append(1.0 if ep_success else 0.0)
 
-            # compute per-episode mean/final angles to summarize (prefer final if available)
+            if ep_terminated:
+                terminated_count += 1
+            if ep_truncated:
+                truncated_count += 1
+            if ep_success:
+                success_count += 1
+            if ep_drop_terminated:
+                drop_terminated_count += 1
+            if ep_topple_terminated:
+                topple_terminated_count += 1
+
             if len(angles) > 0:
                 angle_means.append(float(np.mean(angles)))
             else:
@@ -212,36 +247,33 @@ class CustomEvalCallback(BaseCallback):
         mean_len = float(np.mean(lengths))
         success_rate = float(np.mean(successes))
 
-        mean_angle = float(np.mean(angle_means)) if len(angle_means) > 0 else 0.0
-        mean_angle_rate = float(np.mean(angle_rate_means)) if len(angle_rate_means) > 0 else 0.0
+        total_eps = self.n_eval_episodes
+        terminated_pct = 100.0 * terminated_count / total_eps
+        truncated_pct = 100.0 * truncated_count / total_eps
+        success_pct = 100.0 * success_count / total_eps
+        drop_terminated_pct = 100.0 * drop_terminated_count / total_eps
+        topple_terminated_pct = 100.0 * topple_terminated_count / total_eps
 
-        # log scalars to SB3/Tensorboard via self.logger
         try:
             self.logger.record("custom_eval/mean_reward", mean_reward)
             self.logger.record("custom_eval/mean_ep_length", mean_len)
             self.logger.record("custom_eval/success_rate", success_rate)
-            # cylinder metrics (radians / rad/s by env default)
-            self.logger.record("custom_eval/mean_cylinder_angle", mean_angle)
-            self.logger.record("custom_eval/mean_cylinder_angle_rate", mean_angle_rate)
-            # dump immediately at evaluation step
+            self.logger.record("custom_eval/mean_cylinder_angle", float(np.mean(angle_means)) if angle_means else 0.0)
+            self.logger.record("custom_eval/mean_cylinder_angle_rate", float(np.mean(angle_rate_means)) if angle_rate_means else 0.0)
+            self.logger.record("custom_eval/terminated_pct", terminated_pct)
+            self.logger.record("custom_eval/truncated_pct", truncated_pct)
+            self.logger.record("custom_eval/drop_terminated_pct", drop_terminated_pct)
+            self.logger.record("custom_eval/topple_terminated_pct", topple_terminated_pct)
             self.logger.dump(self.num_timesteps)
         except Exception:
             pass
 
-        # save best model by mean_reward
-        if self.best_model_save_path is not None and mean_reward > self.best_mean_reward:
-            self.best_mean_reward = mean_reward
-            try:
-                save_path = os.path.join(self.best_model_save_path, f"best_mean_reward_{int(self.num_timesteps)}")
-                self.model.save(save_path)
-                if self.verbose:
-                    print(f"[CustomEval] New best mean reward {mean_reward:.3f} at step {self.num_timesteps}; model saved to {save_path}")
-            except Exception as e:
-                print("Failed saving best model from CustomEvalCallback:", e)
-
         if self.verbose:
             print(f"[CustomEval] step={self.num_timesteps} mean_reward={mean_reward:.3f} mean_len={mean_len:.1f} "
-                  f"success_rate={success_rate:.2%} mean_cyl_angle={mean_angle:.4f} rad mean_cyl_angle_rate={mean_angle_rate:.4f} rad/s "
+                  f"success_rate={success_rate:.2%} mean_cyl_angle={float(np.mean(angle_means)) if angle_means else 0.0:.4f} rad "
+                  f"mean_cyl_angle_rate={float(np.mean(angle_rate_means)) if angle_rate_means else 0.0:.4f} rad/s "
+                  f"terminated={terminated_pct:.2f}% truncated={truncated_pct:.2f}% success={success_pct:.2f}% "
+                  f"drop_terminated={drop_terminated_pct:.2f}% topple_terminated={topple_terminated_pct:.2f}% "
                   f"time={time.time()-t0:.1f}s")
 
         return True
@@ -251,7 +283,7 @@ def main():
     # 1) Vectorized envs
     make_env = make_env_fn(
         model_path="assets/panda_tray/panda_tray_cylinder.xml",
-        config_path="config.yaml",
+        config_path="envs/traypose/config.yaml",
         obs_noise_std_pos=0.0,
         obs_noise_std_vel=0.0,
         use_jacobian_tray_obs=False
