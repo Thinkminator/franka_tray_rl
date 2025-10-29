@@ -7,6 +7,7 @@ Practical training script for TrayPoseEnv.
 - Regular + best checkpointing
 """
 import glob
+import signal
 import os
 import sys
 import argparse
@@ -57,6 +58,17 @@ def squash_log_prob(mu, std, action, eps=EPS):
     logp -= torch.log(1 - action.pow(2) + eps).sum(dim=-1)
     return logp
 
+# ----------------------------------------------------------------------
+# Graceful shutdown on Ctrl-C
+# ----------------------------------------------------------------------
+class GracefulKiller:
+    kill_now = False
+    def __init__(self):
+        signal.signal(signal.SIGINT,  self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+    def exit_gracefully(self, *args):
+        self.kill_now = True
 
 # ----------------------------------------------------------------------
 # Core training loop
@@ -70,6 +82,9 @@ def train(model, optimizer, env, start_episode=0):
     if "best_reward" not in train.__globals__:
         train.__globals__["best_reward"] = float("-inf")
 
+    # ---- create the killer --------------------------------------------------
+    killer = GracefulKiller()
+    # ----------------------------------------------------------------------
     for ep in range(start_episode, NUM_EPISODES):
         obs, _ = env.reset()
         done = False
@@ -83,6 +98,19 @@ def train(model, optimizer, env, start_episode=0):
         value_list    = []
         reward_list   = []
         done_list     = []
+
+        # ----- allow interruption between episodes -------------------------
+        if killer.kill_now:
+            print("\nReceived interrupt – saving final checkpoint and exiting...")
+            final_path = f"{CKPT_DIR}/interrupted_ep{ep}.pt"
+            torch.save({
+                "episode": ep,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "reward": 0.0,
+            }, final_path)
+            print(f"   → Saved: {final_path}")
+            break
 
         # --------------------------------------------------------------
         # Rollout (one full episode)
@@ -155,8 +183,8 @@ def train(model, optimizer, env, start_episode=0):
         # --------------------------------------------------------------
         # Logging
         # --------------------------------------------------------------
-        print(f"Ep {ep+1:5d}/{NUM_EPISODES} | Rew {ep_reward:6.2f} | "
-              f"Steps {step:3d} | Loss {total_loss.item():.4f}")
+        print(f"Episode: {ep+1:5d}/{NUM_EPISODES} | Reward gained: {ep_reward:6.2f} | "
+              f"Total Steps {step:3d} | Loss {total_loss.item():.4f}")
 
         # --------------------------------------------------------------
         # Regular checkpoint
