@@ -1,5 +1,53 @@
-obs (34)
-   └─> Trunk: Linear(34→128) + Tanh → Linear(128→128) + Tanh
-         ├─> Actor head: Linear(128→7) → (μ) ─┐
-         │                                     ├─ tanh(μ + ε·σ) → action ∈ [-1,1]^7
-         └─> Critic head: Linear(128→1) → V    └─ σ = exp(log_std) (learnable, 7 params)
+===============================================================================
+                     AdvancedActorCritic (A2C-style, SAC-inspired)
+===============================================================================
+
+Input Observation (34-dim)
+        |
+        ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     SHARED TRUNK (3-layer MLP)                     │
+│  - Linear(34 → 256)  → LayerNorm → ReLU                            │
+│  - Linear(256 → 256) → LayerNorm → ReLU                            │
+│  - Linear(256 → 256) → LayerNorm → ReLU                            │
+└─────────────────────────────────────────────────────────────────────┘
+        |
+        ├─────────────────────┬─────────────────────┐
+        ▼                     ▼                     ▼
+  ACTOR HEAD          TWIN CRITIC HEAD 1     TWIN CRITIC HEAD 2
+  (Gaussian policy)      (Value V1)           (Value V2)
+
+┌─────────────────┐   ┌──────────────────┐   ┌──────────────────┐
+│ mu_head         │   │ critic1          │   │ critic2          │
+│ Linear(256→7)   │   │ Linear(256→1)    │   │ Linear(256→1)    │
+└─────────────────┘   └──────────────────┘   └──────────────────┘
+        |                     |                     |
+        ▼                     ▼                     ▼
+   mu (7-dim)            Value1 (1-dim)      Value2 (1-dim)
+
+        |
+        ▼
+   log_std_head
+   Linear(256→7) → clamp(-20, 2) → exp()
+        |
+        ▼
+      std (7-dim, state-dependent)
+
+        │
+        ├──► Sample raw_action = mu + ε·std   (ε~N(0,1))
+        │
+        ▼
+   Squashed Action = tanh(raw_action)  ∈ [-1, 1]^7
+        │
+        ▼
+   Output Action (7-dim, normalized joint increments)
+
+
+FINAL RETURN (forward pass):
+    action, mu, std, value, v1, v2
+    where value = min(v1, v2)   ← used for bootstrap & advantage
+
+===============================================================================
+Initialization
+-------------------------------------------------------------------------------
+- All Linear layers: Orthogonal init
