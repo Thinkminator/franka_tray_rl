@@ -34,7 +34,7 @@ from AdvancedActorCritic import AdvancedActorCritic
 # ----------------------------------------------------------------------
 # Hyper-parameters (tune here)
 # ----------------------------------------------------------------------
-OBS_DIM               = 34
+OBS_DIM               = 36
 ACT_DIM               = 7
 HIDDEN_SIZE           = 256
 NUM_EPISODES          = 10_000          # total training episodes

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-OBS_DIM               = 34
+OBS_DIM               = 36
 ACT_DIM               = 7
 HIDDEN_SIZE           = 256
 
