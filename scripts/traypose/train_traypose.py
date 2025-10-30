@@ -59,7 +59,10 @@ class CustomEvalCallback(BaseCallback):
       - custom_eval/mean_ep_length
       - custom_eval/success_rate (reads info['is_success'] or info['success'] or info['at_goal'] or goal_hold_counter)
       - custom_eval/mean_cylinder_angle
-      - custom_eval/mean_cylinder_angle_rate
+      - custom_eval/mean_cylinder_offset
+      - custom_eval/topple_terminated
+      - custom_eval/drop_terminated
+      - custom_eval/truncated_pct
 
     best_model_save_path: if provided, save the best model by mean_reward.
     """
@@ -71,72 +74,20 @@ class CustomEvalCallback(BaseCallback):
         self.best_mean_reward = -float("inf")
         self.best_model_save_path = best_model_save_path
         self._last_eval_step = 0
-        # If provided, use this threshold to compute success from goal_hold_counter.
-        # If None, we try to infer from the underlying env.
         self.success_hold_H = success_hold_H
-
-    def _unwrap_base_env(self):
-        """
-        Try to extract the underlying single-env object (Monitor-wrapped) to read env attributes like success_hold_H.
-        Works for common wrappers: VecNormalize -> VecEnv -> Monitor -> Env.
-        Returns None if not found.
-        """
-        e = self.eval_env
-        # Unwrap VecNormalize (has attribute 'env' referencing the VecEnv)
-        if hasattr(e, 'env'):
-            e = e.env
-        # VecEnv often has .envs (a list) of underlying envs
-        try:
-            if hasattr(e, 'envs') and len(e.envs) > 0:
-                candidate = e.envs[0]
-                # If Monitor wrapped it will have .env
-                if hasattr(candidate, 'env'):
-                    base = candidate.env
-                else:
-                    base = candidate
-                # If Monitor wrapped again (rare), unwrap
-                if hasattr(base, 'env'):
-                    base = base.env
-                return base
-        except Exception:
-            pass
-        return None
 
     def _on_step(self) -> bool:
         if (self.num_timesteps - self._last_eval_step) < self.eval_freq:
             return True
         self._last_eval_step = self.num_timesteps
 
-        inferred_success_H = self.success_hold_H
-        if inferred_success_H is None:
-            base_env = self._unwrap_base_env()
-            if base_env is not None and hasattr(base_env, 'success_hold_H'):
-                try:
-                    inferred_success_H = int(getattr(base_env, 'success_hold_H'))
-                except Exception:
-                    inferred_success_H = None
-
-        t0 = time.time()
-        rewards = []
-        lengths = []
-        successes = []
-        angle_means = []
-        angle_rate_means = []
-
-        terminated_count = 0
-        truncated_count = 0
-        success_count = 0
-        drop_terminated_count = 0
-        topple_terminated_count = 0
+        rewards, lengths= [], []
+        angles, offsets = [], []
+        truncated_count = success_count = 0
+        drop_terminated_count = topple_terminated_count = 0
 
         for _ in range(self.n_eval_episodes):
-            res = self.eval_env.reset()
-            if isinstance(res, tuple) and len(res) == 2:
-                obs, info = res
-            else:
-                obs = res
-                info = {}
-
+            obs, info = _reset_env(self.eval_env)
             ep_rew = 0.0
             ep_len = 0
             ep_success = False
@@ -145,86 +96,44 @@ class CustomEvalCallback(BaseCallback):
             ep_drop_terminated = False
             ep_topple_terminated = False
 
-            angles = []
-            angle_rates = []
+            angle = 0
+            offset = 0
 
-            while True:
+            done = False
+            while not done:
                 action, _ = self.model.predict(obs, deterministic=True)
                 step_res = self.eval_env.step(action)
 
-                if isinstance(step_res, tuple) and len(step_res) == 5:
+                if len(step_res) == 5:
                     obs, reward, terminated, truncated, info = step_res
-                    # Unwrap lists if vectorized env returns batches
-                    if isinstance(info, (list, tuple)):
-                        info = info[0]
-                    if isinstance(terminated, (list, tuple, np.ndarray)):
-                        terminated = terminated[0]
-                    if isinstance(truncated, (list, tuple, np.ndarray)):
-                        truncated = truncated[0]
-                    if isinstance(reward, (list, tuple, np.ndarray)):
-                        reward = reward[0]
-                    done = bool(terminated or truncated)
-
-                elif isinstance(step_res, tuple) and len(step_res) == 4:
+                    done = terminated or truncated
+                elif len(step_res) == 4:
                     obs, reward, done, info = step_res
-                    # Unwrap lists if vectorized env returns batches
-                    if isinstance(info, (list, tuple)):
-                        info = info[0]
-                    if isinstance(reward, (list, tuple, np.ndarray)):
-                        reward = reward[0]
-                    done = bool(done)
                     terminated = done
                     truncated = False
-
                 else:
-                    obs, rewards_arr, dones_arr, infos_arr = step_res
-                    reward = float(rewards_arr[0]) if hasattr(rewards_arr, "__len__") else float(rewards_arr)
-                    done = bool(dones_arr[0]) if hasattr(dones_arr, "__len__") else bool(dones_arr)
-                    info = infos_arr[0] if hasattr(infos_arr, "__len__") else infos_arr
-                    terminated = done
-                    truncated = False
-
-                ep_rew += float(reward)
+                    raise ValueError(f"Unexpected step() return length: {len(step_res)}")
+                    
+                ep_rew += reward
                 ep_len += 1
 
-                if isinstance(info, dict):
-                    if "cylinder_angle" in info:
-                        try:
-                            angles.append(float(info["cylinder_angle"]))
-                        except Exception:
-                            pass
-                    if "cylinder_angle_rate" in info:
-                        try:
-                            angle_rates.append(float(info["cylinder_angle_rate"]))
-                        except Exception:
-                            pass
-
-                    if "is_success" in info:
-                        ep_success = ep_success or bool(info["is_success"])
-                    elif "success" in info:
-                        ep_success = ep_success or bool(info["success"])
-                    elif "goal_hold_counter" in info and inferred_success_H is not None:
-                        try:
-                            ep_success = ep_success or (int(info["goal_hold_counter"]) >= int(inferred_success_H))
-                        except Exception:
-                            pass
-                    elif "at_goal" in info:
-                        ep_success = ep_success or bool(info["at_goal"])
-
-                if done or ep_len > 10000:
-                    ep_terminated = bool(terminated)
-                    ep_truncated = bool(truncated)
-                    # Now safe to use .get() on info dict
-                    ep_drop_terminated = bool(info.get('terminated_due_to_drop', False))
-                    ep_topple_terminated = bool(info.get('terminated_due_to_topple', False))
-                    break
+                done = terminated or truncated               
+                if done and info:
+                    if isinstance(info, (list, tuple)) and len(info) == 1:
+                        info = info[0]
+                    ep_success = info.get("is_success", False)
+                    ep_truncated = info.get("truncated", False)
+                    ep_drop_terminated = info.get("terminated_due_to_drop", False)
+                    ep_topple_terminated = info.get("terminated_due_to_topple", False)
+                    offset = info.get("cylinder_offset", 0)
+                    angle = info.get("cylinder_angle", 0)             
+                        
 
             rewards.append(ep_rew)
             lengths.append(ep_len)
-            successes.append(1.0 if ep_success else 0.0)
+            angles.append(angle)
+            offsets.append(offset)
 
-            if ep_terminated:
-                terminated_count += 1
             if ep_truncated:
                 truncated_count += 1
             if ep_success:
@@ -234,21 +143,12 @@ class CustomEvalCallback(BaseCallback):
             if ep_topple_terminated:
                 topple_terminated_count += 1
 
-            if len(angles) > 0:
-                angle_means.append(float(np.mean(angles)))
-            else:
-                angle_means.append(0.0)
-            if len(angle_rates) > 0:
-                angle_rate_means.append(float(np.mean(angle_rates)))
-            else:
-                angle_rate_means.append(0.0)
-
-        mean_reward = float(np.mean(rewards))
-        mean_len = float(np.mean(lengths))
-        success_rate = float(np.mean(successes))
 
         total_eps = self.n_eval_episodes
-        terminated_pct = 100.0 * terminated_count / total_eps
+        mean_reward = np.mean(rewards)
+        mean_len = np.mean(lengths)
+        mean_angle = np.mean(angles)
+        mean_offset = np.mean(offsets)
         truncated_pct = 100.0 * truncated_count / total_eps
         success_pct = 100.0 * success_count / total_eps
         drop_terminated_pct = 100.0 * drop_terminated_count / total_eps
@@ -257,10 +157,9 @@ class CustomEvalCallback(BaseCallback):
         try:
             self.logger.record("custom_eval/mean_reward", mean_reward)
             self.logger.record("custom_eval/mean_ep_length", mean_len)
-            self.logger.record("custom_eval/success_rate", success_rate)
-            self.logger.record("custom_eval/mean_cylinder_angle", float(np.mean(angle_means)) if angle_means else 0.0)
-            self.logger.record("custom_eval/mean_cylinder_angle_rate", float(np.mean(angle_rate_means)) if angle_rate_means else 0.0)
-            self.logger.record("custom_eval/terminated_pct", terminated_pct)
+            self.logger.record("custom_eval/success_rate", success_pct)
+            self.logger.record("custom_eval/mean_cylinder_angle", mean_angle)
+            self.logger.record("custom_eval/mean_cylinder_offset", mean_offset)
             self.logger.record("custom_eval/truncated_pct", truncated_pct)
             self.logger.record("custom_eval/drop_terminated_pct", drop_terminated_pct)
             self.logger.record("custom_eval/topple_terminated_pct", topple_terminated_pct)
@@ -270,11 +169,9 @@ class CustomEvalCallback(BaseCallback):
 
         if self.verbose:
             print(f"[CustomEval] step={self.num_timesteps} mean_reward={mean_reward:.3f} mean_len={mean_len:.1f} "
-                  f"success_rate={success_rate:.2%} mean_cyl_angle={float(np.mean(angle_means)) if angle_means else 0.0:.4f} rad "
-                  f"mean_cyl_angle_rate={float(np.mean(angle_rate_means)) if angle_rate_means else 0.0:.4f} rad/s "
-                  f"terminated={terminated_pct:.2f}% truncated={truncated_pct:.2f}% success={success_pct:.2f}% "
-                  f"drop_terminated={drop_terminated_pct:.2f}% topple_terminated={topple_terminated_pct:.2f}% "
-                  f"time={time.time()-t0:.1f}s")
+                  f"mean_cyl_angle={mean_angle:.4f} rad, mean_cyl_offset={mean_offset:.4f} m "
+                  f"success={success_pct:.2%} truncated={truncated_pct:.2f}% "
+                  f"drop_terminated={drop_terminated_pct:.2f}% topple_terminated={topple_terminated_pct:.2f}% ")
 
         return True
 

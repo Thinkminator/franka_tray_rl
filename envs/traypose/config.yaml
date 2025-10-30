@@ -45,11 +45,12 @@ penalties:
   slide_penalty_max: 0.5
   slant_penalty_min: 0.1
   slant_penalty_max: 0.5
-  progress_k: 5.0 
+  progress_k: 20.0 
+  progress_min: 0.1
   progress_max: 0.5
 
 progress:
-  min_delta: 1e-4
+  min_delta: 5e-3
 
 rim_zone:   # tray-frame half-lengths (positive values only)
   x_half: 0.05
@@ -57,8 +58,8 @@ rim_zone:   # tray-frame half-lengths (positive values only)
   slide_threshold: 0.01
 
 slant_angle:
-  slant_angle_min: 10
-  slant_angle_max: 90
+  slant_angle_min: 5
+  slant_angle_max: 45
 
 
 drop_check:
@@ -66,4 +67,4 @@ drop_check:
 
 success_reward:
   alpha: 50.0   # scale in final bonus: max(0, 5 - alpha*offset)
-  max_bonus: 5.0
+  max_bonus: 50.0

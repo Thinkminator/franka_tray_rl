@@ -177,6 +177,7 @@ class TrayPoseEnv(gym.Env):
         self.slant_penalty_max = float(get("penalties.slant_penalty_max", -0.5))
         self.progress_k = float(get("penalties.progress_k", 5.0))
         self.progress_max = float(get("penalties.progress_max", 0.5))
+        self.progress_min = float(get("penalties.progress_min", 0.1))
         
         self.rim_x_half = float(get("rim_zone.x_half", 0.05))
         self.rim_y_half = float(get("rim_zone.y_half", 0.09))
@@ -185,7 +186,7 @@ class TrayPoseEnv(gym.Env):
         self.slant_angle_min = float(get("slant_angle.slant_angle_min", 10))
         self.slant_angle_max = float(get("slant_angle.slant_angle_max", 90))
 
-        self.min_delta = float(get("progress.min_delta", 1e-4))
+        self.min_delta = float(get("progress.min_delta", 5e-3))
 
         self.drop_center_margin = float(get("drop_check.center_to_center_margin", 0.09))
 
@@ -474,7 +475,7 @@ class TrayPoseEnv(gym.Env):
         delta_goal = self.prev_goal_dist - current_goal_dist  # positive if closer
 
         if delta_goal > self.min_delta:
-            progress_reward = np.clip(self.progress_k * delta_goal, 0.0, self.progress_max)
+            progress_reward = np.clip(self.progress_k * delta_goal, self.progress_min, self.progress_max)
             reward += progress_reward
 
         # Update previous goal distance
@@ -521,6 +522,7 @@ class TrayPoseEnv(gym.Env):
 
         terminated = False
         truncated = False
+        is_success = False
 
         drop_terminated = False
         topple_terminated = False
@@ -541,60 +543,31 @@ class TrayPoseEnv(gym.Env):
                 reward += self.penalty_topple
                 terminated = True
                 topple_terminated = True
+                cyl_angle = angle_from_upright
 
         # Success check: if held goal for H steps, grant final positive reward
         if not terminated and self.goal_hold_counter >= self.success_hold_H:
             cyl_offset = np.linalg.norm(rel_cyl_xy_world)
             final_bonus = max(0.0, self.success_maxbonus - self.success_alpha * cyl_offset)
             reward += final_bonus
+            is_success = True
             terminated = True  # task finishes successfully
 
         # Time limit truncation
         if not terminated and self.t >= self.max_steps:
             truncated = True
 
-        # Build info (angle fields are filled in _get_obs, but we also compute here for clarity)
-        # Recompute angle & rate for info to ensure consistency:
-        cyl_angle = 0.0
-        cyl_angle_rate = 0.0
-        try:
-            # compute cylinder z-axis in world
-            if self.cylinder_type == mujoco.mjtJoint.mjJNT_FREE:
-                cyl_quat = self.data.qpos[self.cylinder_qposadr+3:self.cylinder_qposadr+7]
-                cyl_rot = R.from_quat([cyl_quat[1], cyl_quat[2], cyl_quat[3], cyl_quat[0]])
-                z_cyl = cyl_rot.apply([0, 0, 1])
-            else:
-                z_cyl = np.array([0.0, 0.0, 1.0])
-
-            # tray z-axis in world
-            tray_quat = self.data.xquat[self.tray_body_id].copy()  # [w,x,y,z]
-            tray_quat_xyzw = [tray_quat[1], tray_quat[2], tray_quat[3], tray_quat[0]]
-            R_tray = R.from_quat(tray_quat_xyzw)
-            z_tray = R_tray.apply([0, 0, 1])
-
-            dot = float(np.clip(np.dot(z_cyl, z_tray), -1.0, 1.0))
-            cyl_angle = float(np.arccos(dot))
-
-            if self.prev_cyl_angle is None:
-                cyl_angle_rate = 0.0
-            else:
-                # wrap angle diff to [-pi, pi]
-                delta = (cyl_angle - self.prev_cyl_angle + np.pi) % (2 * np.pi) - np.pi
-                cyl_angle_rate = float(delta / self.control_dt)
-        except Exception:
-            cyl_angle = 0.0
-            cyl_angle_rate = 0.0
-
         info = {
             'goal_hold_counter': self.goal_hold_counter,
             'at_goal': at_goal_now,
-            'pos_err': pos_err,
-            'yaw_err': yaw_err,
-            'cylinder_offset': np.linalg.norm(rel_cyl_xy_world) if not terminated else 0.0,
-            'cylinder_angle': cyl_angle,
-            'cylinder_angle_rate': cyl_angle_rate,
+            'pos_err': pos_err if terminated else 0.0,
+            'yaw_err': yaw_err if terminated else 0.0,
+            'cylinder_offset': np.linalg.norm(rel_cyl_xy_world) if terminated else 0.0,
+            'cylinder_angle': cyl_angle if topple_terminated else 0.0,
             'terminated_due_to_drop': drop_terminated,
-            'terminated_due_to_topple': topple_terminated
+            'terminated_due_to_topple': topple_terminated,
+            'is_success': is_success,
+            'truncated': truncated
         }
         return obs, float(reward), bool(terminated), bool(truncated), info
 
@@ -727,18 +700,11 @@ class TrayPoseEnv(gym.Env):
         cyl_angle_rate = 0.0
         try:
             if self.cylinder_type == mujoco.mjtJoint.mjJNT_FREE:
-                cyl_quat = self.data.qpos[self.cylinder_qposadr+3:self.cylinder_qposadr+7]  # [w,x,y,z]
+                cyl_quat = self.data.qpos[self.cylinder_qposadr+3:self.cylinder_qposadr+7]
                 cyl_rot = R.from_quat([cyl_quat[1], cyl_quat[2], cyl_quat[3], cyl_quat[0]])
-                z_cyl_w = cyl_rot.apply([0, 0, 1])
-            else:
-                z_cyl_w = np.array([0.0, 0.0, 1.0])
-
-            # tray z axis in world
-            tray_rot = R.from_quat(tray_quat_xyzw)
-            z_tray_w = tray_rot.apply([0, 0, 1])
-
-            dot = float(np.clip(np.dot(z_cyl_w, z_tray_w), -1.0, 1.0))
-            cyl_angle = float(np.arccos(dot))
+                z_axis = cyl_rot.apply([0, 0, 1])
+                angle_from_upright = np.arccos(np.clip(z_axis[2], -1.0, 1.0))
+                cyl_angle = angle_from_upright
 
             if self.prev_cyl_angle is None:
                 cyl_angle_rate = 0.0
