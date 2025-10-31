@@ -2,12 +2,12 @@
                      AdvancedActorCritic (A2C-style, SAC-inspired)
 ===============================================================================
 
-Input Observation (34-dim)
+Input Observation (36-dim)
         |
         ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     SHARED TRUNK (3-layer MLP)                     │
-│  - Linear(34 → 256)  → LayerNorm → ReLU                            │
+│  - Linear(36 → 256)  → LayerNorm → ReLU                            │
 │  - Linear(256 → 256) → LayerNorm → ReLU                            │
 │  - Linear(256 → 256) → LayerNorm → ReLU                            │
 └─────────────────────────────────────────────────────────────────────┘
