@@ -33,7 +33,7 @@ from AdvancedActorCritic import AdvancedActorCritic  # <-- same file used in tra
 # ----------------------------------------------------------------------
 # Hyper-parameters (demo only)
 # ----------------------------------------------------------------------
-NUM_STEPS = 10          # rollout length
+NUM_STEPS = 20          # rollout length
 GAMMA     = 0.99
 LR        = 3e-4
 EPS       = 1e-6
@@ -115,10 +115,10 @@ def main():
 
         print(f"\n[Step {step+1}]")
         print(f"  Action:  {action}")
-        print(f"  mu:      {mu.squeeze(0).detach().cpu().numpy()}")
-        print(f"  std:     {std.squeeze(0).detach().cpu().numpy()}")
+        print(f"  mu (Pre-bounded action):      {mu.squeeze(0).detach().cpu().numpy()}")
+        print(f"  std (Exploration rate of the action):     {std.squeeze(0).detach().cpu().numpy()}")
         print(f"  v1: {v1.item():.4f}, v2: {v2.item():.4f} → value: {value.item():.4f}")
-        print(f"  logp:    {logp.item():.4f}")
+        print(f"  logp (Action log-probability by policy):    {logp.item():.4f}")
         print(f"  reward:  {r:.3f}, done: {done}")
 
         obs = next_obs
