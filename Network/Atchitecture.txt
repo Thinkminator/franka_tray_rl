@@ -12,41 +12,42 @@ Input Observation (36-dim)
 │  - Linear(256 → 256) → LayerNorm → ReLU                            │
 └─────────────────────────────────────────────────────────────────────┘
         |
-        ├─────────────────────┬─────────────────────┐
-        ▼                     ▼                     ▼
-  ACTOR HEAD          TWIN CRITIC HEAD 1     TWIN CRITIC HEAD 2
-  (Gaussian policy)      (Value V1)           (Value V2)
-
-┌─────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-│ mu_head         │   │ critic1          │   │ critic2          │
-│ Linear(256→7)   │   │ Linear(256→1)    │   │ Linear(256→1)    │
-└─────────────────┘   └──────────────────┘   └──────────────────┘
-        |                     |                     |
-        ▼                     ▼                     ▼
-   mu (7-dim)            Value1 (1-dim)      Value2 (1-dim)
-
-        |
         ▼
-   log_std_head
-   Linear(256→7) → clamp(-20, 2) → exp()
-        |
-        ▼
-      std (7-dim, state-dependent)
+   ┌───────────────┴───────────────┐
+   │                               │
+   ▼                               ▼
+┌───────────────┐             ┌─────────────────┐
+│  ACTOR HEAD   │             │  TWIN CRITICS   │
+│ (Gaussian)    │             │ (Value Heads)   │
+└───────┬───────┘             └───────┬─────────┘
+        │                               │
+    ┌───┴───┐                       ┌───┴───┐
+    │       │                       │       │
+┌───▼───┐ ┌─▼────┐             ┌─────▼─────┐ ┌─────▼─────┐
+│ mu    │ │log_std│             │ critic1   │ │ critic2   │
+│ head  │ │ head  │             │ (V1)      │ │ (V2)      │
+│(256→7)│ │(256→7)│             │ (256→1)   │ │ (256→1)   │
+└───▲───┘ └──▲───┘             └─────▲─────┘ └─────▲─────┘
+    │       │                       │           │
+    │       │ clamp(-20,2) → exp()  │           │
+    │       └────────► std (7-dim)  │           │
+    │                               │           │
+    ▼                               ▼           ▼
+   mu (7-dim)                   std (7-dim)   min(V1,V2)
+   (mean)                       (state-dep)   → value
+        │                           │
+        └─────────────► raw_action = mu + ε·std
+                                │
+                                ▼
+                        action = tanh(raw_action) ∈ [-1,1]^7
+                                │
+                                ▼
+                     Output Action (7-dim joint increments)
 
-        │
-        ├──► Sample raw_action = mu + ε·std   (ε~N(0,1))
-        │
-        ▼
-   Squashed Action = tanh(raw_action)  ∈ [-1, 1]^7
-        │
-        ▼
-   Output Action (7-dim, normalized joint increments)
 
-
-FINAL RETURN (forward pass):
+FINAL RETURN:
     action, mu, std, value, v1, v2
-    where value = min(v1, v2)   ← used for bootstrap & advantage
-
+    value = min(v1, v2)  ← used for advantage & bootstrap
 ===============================================================================
 Initialization
 -------------------------------------------------------------------------------
