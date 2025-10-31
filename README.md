@@ -63,7 +63,7 @@ Setup Conda Environment:
     conda env create -f environment.yml
     conda activate franka_tray_rl
 
-## 🚀 Running a Demo
+## 🚀 Running a Env Demo
 
 Visualize the tray-cylinder environment:
 
@@ -80,16 +80,35 @@ A MuJoCo viewer will open showing the Panda arm holding the tray.
 A red cylinder will spawn above the tray.
 Random actions will move the tray.
 
-## 🧠 Training a model
+## 🧠 Running a Network model (No viewer render)
 
-Train a model by running:
+To see a forward and backward pass with network update:
+
+    python Network/Net_demo.py
+    
+## 🧠 Training a model(Pytorch based, no viewer render)
+
+Perform training loop with Pytorch:
+
+    python Network/Torch_train.py
+
+## 🧠 Training a model (SB3, no viewer render)
+
+Perform training loop with Stable Baseline 3:
 
     python scripts/traypose/train_traypose.py
 
 
+## 🧠 Testing a model (SB3, with viewer render)
+
+To evaluate a model:
+
+    python scripts/traypose/test_trainpose.py
+
+
 ## 🧠 Next Steps (RL Training)
 
-You can plug TrayPoseEnv into RL libraries like Stable-Baselines3 or RLlib.
+Tuning of the hyperparameter and reward structure to ensure valid training 
 
 
 📌 TODO roadmap
