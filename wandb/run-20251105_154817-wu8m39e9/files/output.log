@@ -1,0 +1,273 @@
+Loaded config from envs/traypose/config.yaml:
+
+============================================================
+TrayPoseEnv initialized with JOINT-SPACE TORQUE CONTROL
+  Model: assets/panda_tray/panda_tray_cylinder.xml
+  Control frame: tray_base (body_id=11)
+  Joint-space gains: Kq=[2000. 2000. 2000. 1500.  500.  400.  300.]
+  Damping gains: Dq=[89.4427191  89.4427191  89.4427191  77.45966692 44.72135955 40.
+ 34.64101615]
+  Action space: 7D joint increments
+  Max joint increment: 0.04 rad/step
+  Sticky q_des: enabled (zero action holds last target)
+  Observation noise: pos_std=0.0000 rad, vel_std=0.0000 rad/s
+  Tray obs mode: Direct MuJoCo
+  Observation space: 36D (includes cylinder angle & angular rate)
+  Success criteria: hold goal for 5 steps
+  Goal tolerances: pos=0.03m, yaw=5.0°
+  Max episode steps: 500
+
+Actuator -> Joint -> DOF mapping:
+  [0] actuator= 0 panda_joint1         -> joint= 0 panda_joint1    | qposadr= 0 dofadr= 0 | gear=1.0
+  [1] actuator= 1 panda_joint2         -> joint= 1 panda_joint2    | qposadr= 1 dofadr= 1 | gear=1.0
+  [2] actuator= 2 panda_joint3         -> joint= 2 panda_joint3    | qposadr= 2 dofadr= 2 | gear=1.0
+  [3] actuator= 3 panda_joint4         -> joint= 3 panda_joint4    | qposadr= 3 dofadr= 3 | gear=1.0
+  [4] actuator= 4 panda_joint5         -> joint= 4 panda_joint5    | qposadr= 4 dofadr= 4 | gear=1.0
+  [5] actuator= 5 panda_joint6         -> joint= 5 panda_joint6    | qposadr= 5 dofadr= 5 | gear=1.0
+  [6] actuator= 6 panda_joint7         -> joint= 6 panda_joint7    | qposadr= 6 dofadr= 6 | gear=1.0
+============================================================
+
+Loaded config from envs/traypose/config.yaml:
+
+============================================================
+TrayPoseEnv initialized with JOINT-SPACE TORQUE CONTROL
+  Model: assets/panda_tray/panda_tray_cylinder.xml
+  Control frame: tray_base (body_id=11)
+  Joint-space gains: Kq=[2000. 2000. 2000. 1500.  500.  400.  300.]
+  Damping gains: Dq=[89.4427191  89.4427191  89.4427191  77.45966692 44.72135955 40.
+ 34.64101615]
+  Action space: 7D joint increments
+  Max joint increment: 0.04 rad/step
+  Sticky q_des: enabled (zero action holds last target)
+  Observation noise: pos_std=0.0000 rad, vel_std=0.0000 rad/s
+  Tray obs mode: Direct MuJoCo
+  Observation space: 36D (includes cylinder angle & angular rate)
+  Success criteria: hold goal for 5 steps
+  Goal tolerances: pos=0.03m, yaw=5.0°
+  Max episode steps: 500
+
+Actuator -> Joint -> DOF mapping:
+  [0] actuator= 0 panda_joint1         -> joint= 0 panda_joint1    | qposadr= 0 dofadr= 0 | gear=1.0
+  [1] actuator= 1 panda_joint2         -> joint= 1 panda_joint2    | qposadr= 1 dofadr= 1 | gear=1.0
+  [2] actuator= 2 panda_joint3         -> joint= 2 panda_joint3    | qposadr= 2 dofadr= 2 | gear=1.0
+  [3] actuator= 3 panda_joint4         -> joint= 3 panda_joint4    | qposadr= 3 dofadr= 3 | gear=1.0
+  [4] actuator= 4 panda_joint5         -> joint= 4 panda_joint5    | qposadr= 4 dofadr= 4 | gear=1.0
+  [5] actuator= 5 panda_joint6         -> joint= 5 panda_joint6    | qposadr= 5 dofadr= 5 | gear=1.0
+  [6] actuator= 6 panda_joint7         -> joint= 6 panda_joint7    | qposadr= 6 dofadr= 6 | gear=1.0
+============================================================
+
+Loaded config from envs/traypose/config.yaml:
+
+============================================================
+TrayPoseEnv initialized with JOINT-SPACE TORQUE CONTROL
+  Model: assets/panda_tray/panda_tray_cylinder.xml
+  Control frame: tray_base (body_id=11)
+  Joint-space gains: Kq=[2000. 2000. 2000. 1500.  500.  400.  300.]
+  Damping gains: Dq=[89.4427191  89.4427191  89.4427191  77.45966692 44.72135955 40.
+ 34.64101615]
+  Action space: 7D joint increments
+  Max joint increment: 0.04 rad/step
+  Sticky q_des: enabled (zero action holds last target)
+  Observation noise: pos_std=0.0000 rad, vel_std=0.0000 rad/s
+  Tray obs mode: Direct MuJoCo
+  Observation space: 36D (includes cylinder angle & angular rate)
+  Success criteria: hold goal for 5 steps
+  Goal tolerances: pos=0.03m, yaw=5.0°
+  Max episode steps: 500
+
+Actuator -> Joint -> DOF mapping:
+  [0] actuator= 0 panda_joint1         -> joint= 0 panda_joint1    | qposadr= 0 dofadr= 0 | gear=1.0
+  [1] actuator= 1 panda_joint2         -> joint= 1 panda_joint2    | qposadr= 1 dofadr= 1 | gear=1.0
+  [2] actuator= 2 panda_joint3         -> joint= 2 panda_joint3    | qposadr= 2 dofadr= 2 | gear=1.0
+  [3] actuator= 3 panda_joint4         -> joint= 3 panda_joint4    | qposadr= 3 dofadr= 3 | gear=1.0
+  [4] actuator= 4 panda_joint5         -> joint= 4 panda_joint5    | qposadr= 4 dofadr= 4 | gear=1.0
+  [5] actuator= 5 panda_joint6         -> joint= 5 panda_joint6    | qposadr= 5 dofadr= 5 | gear=1.0
+  [6] actuator= 6 panda_joint7         -> joint= 6 panda_joint7    | qposadr= 6 dofadr= 6 | gear=1.0
+============================================================
+
+Loaded config from envs/traypose/config.yaml:
+
+============================================================
+TrayPoseEnv initialized with JOINT-SPACE TORQUE CONTROL
+  Model: assets/panda_tray/panda_tray_cylinder.xml
+  Control frame: tray_base (body_id=11)
+  Joint-space gains: Kq=[2000. 2000. 2000. 1500.  500.  400.  300.]
+  Damping gains: Dq=[89.4427191  89.4427191  89.4427191  77.45966692 44.72135955 40.
+ 34.64101615]
+  Action space: 7D joint increments
+  Max joint increment: 0.04 rad/step
+  Sticky q_des: enabled (zero action holds last target)
+  Observation noise: pos_std=0.0000 rad, vel_std=0.0000 rad/s
+  Tray obs mode: Direct MuJoCo
+  Observation space: 36D (includes cylinder angle & angular rate)
+  Success criteria: hold goal for 5 steps
+  Goal tolerances: pos=0.03m, yaw=5.0°
+  Max episode steps: 500
+
+Actuator -> Joint -> DOF mapping:
+  [0] actuator= 0 panda_joint1         -> joint= 0 panda_joint1    | qposadr= 0 dofadr= 0 | gear=1.0
+  [1] actuator= 1 panda_joint2         -> joint= 1 panda_joint2    | qposadr= 1 dofadr= 1 | gear=1.0
+  [2] actuator= 2 panda_joint3         -> joint= 2 panda_joint3    | qposadr= 2 dofadr= 2 | gear=1.0
+  [3] actuator= 3 panda_joint4         -> joint= 3 panda_joint4    | qposadr= 3 dofadr= 3 | gear=1.0
+  [4] actuator= 4 panda_joint5         -> joint= 4 panda_joint5    | qposadr= 4 dofadr= 4 | gear=1.0
+  [5] actuator= 5 panda_joint6         -> joint= 5 panda_joint6    | qposadr= 5 dofadr= 5 | gear=1.0
+  [6] actuator= 6 panda_joint7         -> joint= 6 panda_joint7    | qposadr= 6 dofadr= 6 | gear=1.0
+============================================================
+
+Loaded config from envs/traypose/config.yaml:
+
+============================================================
+TrayPoseEnv initialized with JOINT-SPACE TORQUE CONTROL
+  Model: assets/panda_tray/panda_tray_cylinder.xml
+  Control frame: tray_base (body_id=11)
+  Joint-space gains: Kq=[2000. 2000. 2000. 1500.  500.  400.  300.]
+  Damping gains: Dq=[89.4427191  89.4427191  89.4427191  77.45966692 44.72135955 40.
+ 34.64101615]
+  Action space: 7D joint increments
+  Max joint increment: 0.04 rad/step
+  Sticky q_des: enabled (zero action holds last target)
+  Observation noise: pos_std=0.0000 rad, vel_std=0.0000 rad/s
+  Tray obs mode: Direct MuJoCo
+  Observation space: 36D (includes cylinder angle & angular rate)
+  Success criteria: hold goal for 5 steps
+  Goal tolerances: pos=0.03m, yaw=5.0°
+  Max episode steps: 500
+
+Actuator -> Joint -> DOF mapping:
+  [0] actuator= 0 panda_joint1         -> joint= 0 panda_joint1    | qposadr= 0 dofadr= 0 | gear=1.0
+  [1] actuator= 1 panda_joint2         -> joint= 1 panda_joint2    | qposadr= 1 dofadr= 1 | gear=1.0
+  [2] actuator= 2 panda_joint3         -> joint= 2 panda_joint3    | qposadr= 2 dofadr= 2 | gear=1.0
+  [3] actuator= 3 panda_joint4         -> joint= 3 panda_joint4    | qposadr= 3 dofadr= 3 | gear=1.0
+  [4] actuator= 4 panda_joint5         -> joint= 4 panda_joint5    | qposadr= 4 dofadr= 4 | gear=1.0
+  [5] actuator= 5 panda_joint6         -> joint= 5 panda_joint6    | qposadr= 5 dofadr= 5 | gear=1.0
+  [6] actuator= 6 panda_joint7         -> joint= 6 panda_joint7    | qposadr= 6 dofadr= 6 | gear=1.0
+============================================================
+
+Loaded config from envs/traypose/config.yaml:
+
+============================================================
+TrayPoseEnv initialized with JOINT-SPACE TORQUE CONTROL
+  Model: assets/panda_tray/panda_tray_cylinder.xml
+  Control frame: tray_base (body_id=11)
+  Joint-space gains: Kq=[2000. 2000. 2000. 1500.  500.  400.  300.]
+  Damping gains: Dq=[89.4427191  89.4427191  89.4427191  77.45966692 44.72135955 40.
+ 34.64101615]
+  Action space: 7D joint increments
+  Max joint increment: 0.04 rad/step
+  Sticky q_des: enabled (zero action holds last target)
+  Observation noise: pos_std=0.0000 rad, vel_std=0.0000 rad/s
+  Tray obs mode: Direct MuJoCo
+  Observation space: 36D (includes cylinder angle & angular rate)
+  Success criteria: hold goal for 5 steps
+  Goal tolerances: pos=0.03m, yaw=5.0°
+  Max episode steps: 500
+
+Actuator -> Joint -> DOF mapping:
+  [0] actuator= 0 panda_joint1         -> joint= 0 panda_joint1    | qposadr= 0 dofadr= 0 | gear=1.0
+  [1] actuator= 1 panda_joint2         -> joint= 1 panda_joint2    | qposadr= 1 dofadr= 1 | gear=1.0
+  [2] actuator= 2 panda_joint3         -> joint= 2 panda_joint3    | qposadr= 2 dofadr= 2 | gear=1.0
+  [3] actuator= 3 panda_joint4         -> joint= 3 panda_joint4    | qposadr= 3 dofadr= 3 | gear=1.0
+  [4] actuator= 4 panda_joint5         -> joint= 4 panda_joint5    | qposadr= 4 dofadr= 4 | gear=1.0
+  [5] actuator= 5 panda_joint6         -> joint= 5 panda_joint6    | qposadr= 5 dofadr= 5 | gear=1.0
+  [6] actuator= 6 panda_joint7         -> joint= 6 panda_joint7    | qposadr= 6 dofadr= 6 | gear=1.0
+============================================================
+
+Loaded config from envs/traypose/config.yaml:
+
+============================================================
+TrayPoseEnv initialized with JOINT-SPACE TORQUE CONTROL
+  Model: assets/panda_tray/panda_tray_cylinder.xml
+  Control frame: tray_base (body_id=11)
+  Joint-space gains: Kq=[2000. 2000. 2000. 1500.  500.  400.  300.]
+  Damping gains: Dq=[89.4427191  89.4427191  89.4427191  77.45966692 44.72135955 40.
+ 34.64101615]
+  Action space: 7D joint increments
+  Max joint increment: 0.04 rad/step
+  Sticky q_des: enabled (zero action holds last target)
+  Observation noise: pos_std=0.0000 rad, vel_std=0.0000 rad/s
+  Tray obs mode: Direct MuJoCo
+  Observation space: 36D (includes cylinder angle & angular rate)
+  Success criteria: hold goal for 5 steps
+  Goal tolerances: pos=0.03m, yaw=5.0°
+  Max episode steps: 500
+
+Actuator -> Joint -> DOF mapping:
+  [0] actuator= 0 panda_joint1         -> joint= 0 panda_joint1    | qposadr= 0 dofadr= 0 | gear=1.0
+  [1] actuator= 1 panda_joint2         -> joint= 1 panda_joint2    | qposadr= 1 dofadr= 1 | gear=1.0
+  [2] actuator= 2 panda_joint3         -> joint= 2 panda_joint3    | qposadr= 2 dofadr= 2 | gear=1.0
+  [3] actuator= 3 panda_joint4         -> joint= 3 panda_joint4    | qposadr= 3 dofadr= 3 | gear=1.0
+  [4] actuator= 4 panda_joint5         -> joint= 4 panda_joint5    | qposadr= 4 dofadr= 4 | gear=1.0
+  [5] actuator= 5 panda_joint6         -> joint= 5 panda_joint6    | qposadr= 5 dofadr= 5 | gear=1.0
+  [6] actuator= 6 panda_joint7         -> joint= 6 panda_joint7    | qposadr= 6 dofadr= 6 | gear=1.0
+============================================================
+
+Loaded config from envs/traypose/config.yaml:
+
+============================================================
+TrayPoseEnv initialized with JOINT-SPACE TORQUE CONTROL
+  Model: assets/panda_tray/panda_tray_cylinder.xml
+  Control frame: tray_base (body_id=11)
+  Joint-space gains: Kq=[2000. 2000. 2000. 1500.  500.  400.  300.]
+  Damping gains: Dq=[89.4427191  89.4427191  89.4427191  77.45966692 44.72135955 40.
+ 34.64101615]
+  Action space: 7D joint increments
+  Max joint increment: 0.04 rad/step
+  Sticky q_des: enabled (zero action holds last target)
+  Observation noise: pos_std=0.0000 rad, vel_std=0.0000 rad/s
+  Tray obs mode: Direct MuJoCo
+  Observation space: 36D (includes cylinder angle & angular rate)
+  Success criteria: hold goal for 5 steps
+  Goal tolerances: pos=0.03m, yaw=5.0°
+  Max episode steps: 500
+
+Actuator -> Joint -> DOF mapping:
+  [0] actuator= 0 panda_joint1         -> joint= 0 panda_joint1    | qposadr= 0 dofadr= 0 | gear=1.0
+  [1] actuator= 1 panda_joint2         -> joint= 1 panda_joint2    | qposadr= 1 dofadr= 1 | gear=1.0
+  [2] actuator= 2 panda_joint3         -> joint= 2 panda_joint3    | qposadr= 2 dofadr= 2 | gear=1.0
+  [3] actuator= 3 panda_joint4         -> joint= 3 panda_joint4    | qposadr= 3 dofadr= 3 | gear=1.0
+  [4] actuator= 4 panda_joint5         -> joint= 4 panda_joint5    | qposadr= 4 dofadr= 4 | gear=1.0
+  [5] actuator= 5 panda_joint6         -> joint= 5 panda_joint6    | qposadr= 5 dofadr= 5 | gear=1.0
+  [6] actuator= 6 panda_joint7         -> joint= 6 panda_joint7    | qposadr= 6 dofadr= 6 | gear=1.0
+============================================================
+
+Using cpu device
+Loaded config from envs/traypose/config.yaml:
+
+============================================================
+TrayPoseEnv initialized with JOINT-SPACE TORQUE CONTROL
+  Model: assets/panda_tray/panda_tray_cylinder.xml
+  Control frame: tray_base (body_id=11)
+  Joint-space gains: Kq=[2000. 2000. 2000. 1500.  500.  400.  300.]
+  Damping gains: Dq=[89.4427191  89.4427191  89.4427191  77.45966692 44.72135955 40.
+ 34.64101615]
+  Action space: 7D joint increments
+  Max joint increment: 0.04 rad/step
+  Sticky q_des: enabled (zero action holds last target)
+  Observation noise: pos_std=0.0000 rad, vel_std=0.0000 rad/s
+  Tray obs mode: Direct MuJoCo
+  Observation space: 36D (includes cylinder angle & angular rate)
+  Success criteria: hold goal for 5 steps
+  Goal tolerances: pos=0.03m, yaw=5.0°
+  Max episode steps: 500
+
+Actuator -> Joint -> DOF mapping:
+  [0] actuator= 0 panda_joint1         -> joint= 0 panda_joint1    | qposadr= 0 dofadr= 0 | gear=1.0
+  [1] actuator= 1 panda_joint2         -> joint= 1 panda_joint2    | qposadr= 1 dofadr= 1 | gear=1.0
+  [2] actuator= 2 panda_joint3         -> joint= 2 panda_joint3    | qposadr= 2 dofadr= 2 | gear=1.0
+  [3] actuator= 3 panda_joint4         -> joint= 3 panda_joint4    | qposadr= 3 dofadr= 3 | gear=1.0
+  [4] actuator= 4 panda_joint5         -> joint= 4 panda_joint5    | qposadr= 4 dofadr= 4 | gear=1.0
+  [5] actuator= 5 panda_joint6         -> joint= 5 panda_joint6    | qposadr= 5 dofadr= 5 | gear=1.0
+  [6] actuator= 6 panda_joint7         -> joint= 6 panda_joint7    | qposadr= 6 dofadr= 6 | gear=1.0
+============================================================
+Traceback (most recent call last):
+  File "/home/think/ME5418/franka_tray_rl/scripts/traypose/train_traypose.py", line 352, in <module>
+    main()
+  File "/home/think/ME5418/franka_tray_rl/scripts/traypose/train_traypose.py", line 325, in main
+    wandb_callback = WandbCallback(
+TypeError: __init__() got an unexpected keyword argument 'model_save_path'
+Traceback (most recent call last):
+  File "/home/think/ME5418/franka_tray_rl/scripts/traypose/train_traypose.py", line 352, in <module>
+    main()
+  File "/home/think/ME5418/franka_tray_rl/scripts/traypose/train_traypose.py", line 325, in main
+    wandb_callback = WandbCallback(
+TypeError: __init__() got an unexpected keyword argument 'model_save_path'

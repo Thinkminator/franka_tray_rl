@@ -59,7 +59,8 @@ def evaluate_model(model_path, num_episodes=3):
                     print(f"  Step {step_count}, Reward: {reward:.3f}, Terminated={terminated}, Truncated={truncated}")
                 
                 step_count += 1
-                time.sleep(env.control_dt)  # Maintain real-time speed
+                # time.sleep(env.control_dt)  # Maintain real-time speed
+                time.sleep(1.0)
             
             print(f"Episode {ep+1} finished after {step_count} steps with reward: {ep_reward:.3f}")
             all_rewards.append(ep_reward)
@@ -68,6 +69,6 @@ def evaluate_model(model_path, num_episodes=3):
     print(f"\nAverage reward over {num_episodes} episodes: {avg_reward:.3f}")
 
 if __name__ == "__main__":
-    # model_path = "training/checkpoints/best_model.zip"
-    model_path = "checkpoints/best.pt"
+    model_path = "training/checkpoints/best_model.zip"
+    # model_path = "checkpoints/best.pt"
     evaluate_model(model_path)

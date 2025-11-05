@@ -283,7 +283,7 @@ def main():
         
         for episode in range(num_episodes):
             if mode == "zero":
-                run_zero_action_mode(env, viewer, episode, pause_seconds=3.0)
+                run_zero_action_mode(env, viewer, episode, pause_seconds=10.0)
             elif mode == "seeded":
                 run_seeded_action_mode(env, viewer, episode, max_steps=500, seed=123)
             else:  # random

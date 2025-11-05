@@ -1,0 +1,24 @@
+2025-11-05 15:49:24,674 INFO    MainThread:43180 [wandb_setup.py:_flush():81] Current SDK version is 0.22.3
+2025-11-05 15:49:24,674 INFO    MainThread:43180 [wandb_setup.py:_flush():81] Configure stats pid to 43180
+2025-11-05 15:49:24,674 INFO    MainThread:43180 [wandb_setup.py:_flush():81] Loading settings from /home/think/.config/wandb/settings
+2025-11-05 15:49:24,674 INFO    MainThread:43180 [wandb_setup.py:_flush():81] Loading settings from /home/think/ME5418/franka_tray_rl/wandb/settings
+2025-11-05 15:49:24,675 INFO    MainThread:43180 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2025-11-05 15:49:24,675 INFO    MainThread:43180 [wandb_init.py:setup_run_log_directory():706] Logging user logs to /home/think/ME5418/franka_tray_rl/wandb/run-20251105_154924-vusnirae/logs/debug.log
+2025-11-05 15:49:24,675 INFO    MainThread:43180 [wandb_init.py:setup_run_log_directory():707] Logging internal logs to /home/think/ME5418/franka_tray_rl/wandb/run-20251105_154924-vusnirae/logs/debug-internal.log
+2025-11-05 15:49:24,677 INFO    MainThread:43180 [wandb_init.py:init():833] calling init triggers
+2025-11-05 15:49:24,678 INFO    MainThread:43180 [wandb_init.py:init():838] wandb.init called with sweep_config: {}
+config: {'n_envs': 8, 'n_steps': 1024, 'batch_size': 256, 'total_timesteps': 1000000, 'learning_rate': 0.0001, 'gamma': 0.99, 'gae_lambda': 0.95, 'clip_range': 0.2, 'ent_coef': 0.001, 'vf_coef': 0.5, 'n_epochs': 10, 'seed': 42, '_wandb': {'code_path': 'code/scripts/traypose/train_traypose.py'}}
+2025-11-05 15:49:24,678 INFO    MainThread:43180 [wandb_init.py:init():881] starting backend
+2025-11-05 15:49:24,904 INFO    MainThread:43180 [wandb_init.py:init():884] sending inform_init request
+2025-11-05 15:49:24,923 INFO    MainThread:43180 [wandb_init.py:init():892] backend started and connected
+2025-11-05 15:49:24,925 INFO    MainThread:43180 [wandb_init.py:init():962] updated telemetry
+2025-11-05 15:49:24,942 INFO    MainThread:43180 [wandb_init.py:init():986] communicating run to backend with 90.0 second timeout
+2025-11-05 15:49:31,015 INFO    MainThread:43180 [wandb_init.py:init():1033] starting run threads in backend
+2025-11-05 15:49:31,112 INFO    MainThread:43180 [wandb_run.py:_console_start():2506] atexit reg
+2025-11-05 15:49:31,112 INFO    MainThread:43180 [wandb_run.py:_redirect():2354] redirect: wrap_raw
+2025-11-05 15:49:31,112 INFO    MainThread:43180 [wandb_run.py:_redirect():2423] Wrapping output streams.
+2025-11-05 15:49:31,112 INFO    MainThread:43180 [wandb_run.py:_redirect():2446] Redirects installed.
+2025-11-05 15:49:31,114 INFO    MainThread:43180 [wandb_init.py:init():1073] run started, returning control to user process
+2025-11-05 15:49:31,651 INFO    MainThread:43180 [wandb_run.py:_tensorboard_callback():1598] tensorboard callback: training/logs/PPO_2, True
+2025-11-05 15:59:02,443 INFO    wandb-AsyncioManager-main:43180 [service_client.py:_forward_responses():80] Reached EOF.
+2025-11-05 15:59:02,443 INFO    wandb-AsyncioManager-main:43180 [mailbox.py:close():137] Closing mailbox, abandoning 1 handles.

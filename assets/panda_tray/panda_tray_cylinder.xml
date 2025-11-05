@@ -113,10 +113,17 @@
       </body>
     </body>
 
-    <body name="cylinder" pos="0.788 0.108 0.658"> <!-- 0.621 + 0.03 + 0.005 + 0.002 (offset)-->
+    <body name="cylinder" pos="0.788 0.108 0.655"> <!-- 0.621 + 0.03 + 0.005 + 0.002 (offset)-->
       <freejoint name="cylinder_free"/>
       <geom name="cylinder_geom" type="cylinder" size="0.02 0.03"
             mass="0.2" friction="0.6 0.005 0.0001" material="ball_red"/>
+    </body>
+
+    <body name="start_marker_body" pos="0 0 0" mocap="true">
+      <geom name="start_marker" type="sphere" size="0.02" rgba="0 1 0 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="goal_marker_body" pos="0 0 0" mocap="true">
+      <geom name="goal_marker" type="sphere" size="0.02" rgba="1 0 0 0.8" contype="0" conaffinity="0"/>
     </body>
 
     <geom name="ground" type="plane" size="2 2 0.1" pos="0 0 0" material="environment"/>

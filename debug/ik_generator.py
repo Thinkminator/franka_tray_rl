@@ -23,8 +23,8 @@ MJCF_PATH = "assets/panda_tray/panda_tray_cylinder.xml"
 MUJOCO_MODEL_TYPE = "xml"  # Change to "urdf" to load URDF instead
 
 # Desired tray target pose
-target_pos = [0.785, 0.107, 0.619]
-target_rpy = [0, 0, 2.11]
+target_pos = [0.458, -0.458, 0.421]
+target_rpy = [0, 0, 1.55]
 
 print(f"\nMuJoCo will load: {MUJOCO_MODEL_TYPE.upper()}")
 print(f"Target pose:")

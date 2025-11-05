@@ -322,7 +322,10 @@ def main():
         save_vecnormalize=True,
     )
 
-    wandb_callback = WandbCallback(verbose=2)
+    wandb_callback = WandbCallback(
+        model_save_path=os.path.join(save_dir, "wandb_models"),
+        verbose=2,
+    )
 
     # 5) Train
     try:

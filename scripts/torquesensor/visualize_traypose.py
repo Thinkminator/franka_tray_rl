@@ -68,7 +68,7 @@ def print_observation_details(obs, step=0):
     print(f"Cylinder XY (tray):  {obs[30:32]}")
     print(f"Cylinder vel XY:     {obs[32:34]}")
 
-def run_zero_action_mode(env, viewer, episode, pause_seconds=3.0):
+def run_zero_action_mode(env, viewer, episode, pause_seconds=10.0):
     """Mode 1: Zero action - arm stays at start pose"""
     print(f"\n=== Episode {episode+1} - ZERO ACTION MODE ===")
     
@@ -80,6 +80,7 @@ def run_zero_action_mode(env, viewer, episode, pause_seconds=3.0):
     
     print(f"\nHolding start pose with zero actions for {pause_seconds}s...")
     n_steps = int(pause_seconds / env.control_dt)
+    print(f"\ncontrol dt {env.control_dt}")
     
     action = np.zeros(7, dtype=np.float32)
     print(f"Action (zero): {action}")
@@ -103,8 +104,8 @@ def run_zero_action_mode(env, viewer, episode, pause_seconds=3.0):
             print(f"    Terminated: {terminated}, Truncated: {truncated}, HoldCounter: {info.get('goal_hold_counter')}")
         
         viewer.sync()
-        # time.sleep(env.control_dt)
-        time.sleep(1)
+        time.sleep(env.control_dt)
+        # time.sleep(1)
         
         if done or not viewer.is_running():
             if done:
@@ -269,7 +270,7 @@ def main():
         
         for episode in range(num_episodes):
             if mode == "zero":
-                run_zero_action_mode(env, viewer, episode, pause_seconds=3.0)
+                run_zero_action_mode(env, viewer, episode, pause_seconds=10.0)
             elif mode == "seeded":
                 run_seeded_action_mode(env, viewer, episode, max_steps=500, seed=123)
             else:  # random

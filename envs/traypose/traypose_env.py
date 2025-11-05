@@ -107,7 +107,7 @@ class TrayPoseEnv(gym.Env):
         self.goal_pos_tolerance = float(get("goal.pos_tolerance", 0.03))
         self.goal_yaw_tolerance = float(get("goal.yaw_tolerance_deg", 5.0)) * np.pi / 180.0
         self.success_hold_H = int(get("goal.success_hold_steps", 5))
-        self.max_steps = int(get("goal.max_steps", 150))
+        self.max_steps = int(get("goal.max_steps", 500))
 
         # Cylinder start
         self.start_cylinder = np.array(get("start.cylinder", [0.788, 0.108, 0.655]), dtype=np.float64)
@@ -208,6 +208,12 @@ class TrayPoseEnv(gym.Env):
         # For cylinder angle rate estimation
         self.prev_cyl_angle = None
 
+        # Cache body IDs for start and goal marker bodies
+        self.start_marker_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "start_marker_body")
+        self.goal_marker_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "goal_marker_body")
+        if self.start_marker_body_id == -1 or self.goal_marker_body_id == -1:
+            raise ValueError("Start or goal marker body not found in model")
+
         print(f"\n{'='*60}")
         print(f"TrayPoseEnv initialized with JOINT-SPACE TORQUE CONTROL")
         print(f"  Model: {self.model_path}")
@@ -255,6 +261,13 @@ class TrayPoseEnv(gym.Env):
             return out_min + exp_factor * (out_max - out_min)
         else:
             raise ValueError(f"Unknown interpolation method: {method}")
+
+    def _update_markers(self):
+        start_mocap_id = self.model.body_mocapid[self.start_marker_body_id]
+        goal_mocap_id = self.model.body_mocapid[self.goal_marker_body_id]
+
+        self.data.mocap_pos[start_mocap_id] = self.start_tray_pos
+        self.data.mocap_pos[goal_mocap_id] = self.goal_tray_pos
 
     def _get_arm_qpos(self, noisy=False):
         q = np.array([self.data.qpos[addr] for addr in self.arm_qposadr], dtype=np.float64)
@@ -403,16 +416,10 @@ class TrayPoseEnv(gym.Env):
                 self.data.qvel[self.cylinder_dofadr:self.cylinder_dofadr+3] = 0.0
             except Exception:
                 pass
+        
+        self._update_markers()
 
         mujoco.mj_forward(self.model, self.data)
-
-        # # --- Add settling phase: run simulation forward with zero action (hold start pose) ---
-        # settle_steps = 100  
-        # self.q_des = self.start_joint_positions.copy()  
-        # for _ in range(settle_steps):
-        #     tau = self._compute_torque_control()  
-        #     self._set_arm_ctrl(tau)               
-        #     mujoco.mj_step(self.model, self.data)
 
         # Record tray pose (ground truth for control)
         self.tray_pos = self.data.xpos[self.tray_body_id].copy()
