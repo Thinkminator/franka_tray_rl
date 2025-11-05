@@ -103,7 +103,8 @@ def run_zero_action_mode(env, viewer, episode, pause_seconds=3.0):
             print(f"    Terminated: {terminated}, Truncated: {truncated}, HoldCounter: {info.get('goal_hold_counter')}")
         
         viewer.sync()
-        time.sleep(env.control_dt)
+        # time.sleep(env.control_dt)
+        time.sleep(1)
         
         if done or not viewer.is_running():
             if done:

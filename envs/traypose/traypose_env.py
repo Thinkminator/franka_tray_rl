@@ -237,6 +237,25 @@ class TrayPoseEnv(gym.Env):
     def _wrap_angle(a):
         return (a + np.pi) % (2 * np.pi) - np.pi
 
+    @staticmethod
+    def interpolate(value, in_min, in_max, out_min, out_max, method='linear', exp_rate=5.0):
+        """
+        Interpolates `value` from input range [in_min, in_max] to output range [out_min, out_max].
+        """
+        import numpy as np
+        x = (value - in_min) / (in_max - in_min)
+        x = np.clip(x, 0, 1)
+
+        if method == 'linear':
+            return out_min + x * (out_max - out_min)
+        elif method == 'exponential':
+            if exp_rate == 0:
+                return out_min + x * (out_max - out_min)
+            exp_factor = (1 - np.exp(-exp_rate * x)) / (1 - np.exp(-exp_rate))
+            return out_min + exp_factor * (out_max - out_min)
+        else:
+            raise ValueError(f"Unknown interpolation method: {method}")
+
     def _get_arm_qpos(self, noisy=False):
         q = np.array([self.data.qpos[addr] for addr in self.arm_qposadr], dtype=np.float64)
         if noisy and self.obs_noise_std_pos > 0:
@@ -387,6 +406,14 @@ class TrayPoseEnv(gym.Env):
 
         mujoco.mj_forward(self.model, self.data)
 
+        # # --- Add settling phase: run simulation forward with zero action (hold start pose) ---
+        # settle_steps = 100  
+        # self.q_des = self.start_joint_positions.copy()  
+        # for _ in range(settle_steps):
+        #     tau = self._compute_torque_control()  
+        #     self._set_arm_ctrl(tau)               
+        #     mujoco.mj_step(self.model, self.data)
+
         # Record tray pose (ground truth for control)
         self.tray_pos = self.data.xpos[self.tray_body_id].copy()
         tray_quat = self.data.xquat[self.tray_body_id].copy()  # [w,x,y,z]
@@ -491,9 +518,12 @@ class TrayPoseEnv(gym.Env):
 
         if distance <= rim_diagonal and distance >= self.slide_threshold:
             # Clamp distance to the interpolation range
-            sliding_penalty = np.interp(distance,
-                    [self.slide_threshold, rim_diagonal],
-                    [self.slide_penalty_min, self.slide_penalty_max])
+            sliding_penalty = self.interpolate(
+                    distance,
+                    self.slide_threshold, rim_diagonal,
+                    self.slide_penalty_min, self.slide_penalty_max,
+                    method='linear', exp_rate=5.0
+                    )
             reward += sliding_penalty
 
         # Continous slanting penalty based on angle of tray
@@ -504,19 +534,21 @@ class TrayPoseEnv(gym.Env):
 
         # Interpolate roll penalty
         if roll_abs >= slant_angle_min_rad:
-            roll_penalty = np.interp(
+            roll_penalty = self.interpolate(
                 roll_abs,
-                [slant_angle_min_rad, slant_angle_max_rad],
-                [self.slant_penalty_min, self.slant_penalty_max]
+                slant_angle_min_rad, slant_angle_max_rad,
+                self.slant_penalty_min, self.slant_penalty_max,
+                method='linear', exp_rate=5.0
             )
             reward += roll_penalty
 
         # Interpolate pitch penalty
         if pitch_abs >= slant_angle_min_rad:
-            pitch_penalty = np.interp(
+            pitch_penalty = self.interpolate(
                 pitch_abs,
-                [slant_angle_min_rad, slant_angle_max_rad],
-                [self.slant_penalty_min, self.slant_penalty_max]
+                slant_angle_min_rad, slant_angle_max_rad,
+                self.slant_penalty_min, self.slant_penalty_max,
+                method='linear', exp_rate=5.0
             )
             reward += pitch_penalty
 

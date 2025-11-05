@@ -113,7 +113,7 @@
       </body>
     </body>
 
-    <body name="cylinder" pos="0.788 0.108 0.655">
+    <body name="cylinder" pos="0.788 0.108 0.658"> <!-- 0.621 + 0.03 + 0.005 + 0.002 (offset)-->
       <freejoint name="cylinder_free"/>
       <geom name="cylinder_geom" type="cylinder" size="0.02 0.03"
             mass="0.2" friction="0.6 0.005 0.0001" material="ball_red"/>
