@@ -98,9 +98,15 @@ Evaluate with TensorBoard:
 
     python scripts/traypose/train_traypose_tensorboard.py
 
+To see the training evaluation:
+
+    tensorboard --logdir training/logs
+
 Evaluate with Weights & Biases (wandb):
 
     python scripts/traypose/train_traypose_wandb.py
+
+
 
 
 ## 🧠 Testing a model (SB3, with viewer render)
