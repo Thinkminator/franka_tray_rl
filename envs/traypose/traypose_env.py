@@ -214,6 +214,21 @@ class TrayPoseEnv(gym.Env):
         if self.start_marker_body_id == -1 or self.goal_marker_body_id == -1:
             raise ValueError("Start or goal marker body not found in model")
 
+        # save the default
+        self._defaults = dict(
+            max_joint_increment=self.max_joint_increment,
+            success_hold_H=self.success_hold_H,
+            goal_tray_pos=self.goal_tray_pos.copy(),
+            goal_tray_rpy=self.goal_tray_rpy.copy(),
+            progress_k=self.progress_k,
+            progress_min=self.progress_min,
+            progress_max=self.progress_max,
+            slant_angle_min=self.slant_angle_min,
+            slant_penalty_min=self.slant_penalty_min,
+            slant_penalty_max=self.slant_penalty_max,
+            penalty_idle=self.penalty_idle,
+        )
+
         print(f"\n{'='*60}")
         print(f"TrayPoseEnv initialized with JOINT-SPACE TORQUE CONTROL")
         print(f"  Model: {self.model_path}")
@@ -239,6 +254,63 @@ class TrayPoseEnv(gym.Env):
                   f"qposadr={self.arm_qposadr[i]:2d} dofadr={self.arm_dofadr[i]:2d} | gear={gear:.1f}")
         print(f"{'='*60}\n")
 
+        # Start in default/original task unless training script overrides via set_phase()
+        self.phase = 2
+        self._idle_grace_steps = 0
+
+    # ===== Curriculum helpers =====
+    def set_phase(self, phase: int):
+        """Phase 0–1: balance-only. Phase 2+: your original task."""
+        self.phase = int(phase)
+
+        if self.phase == 0:
+            self.max_joint_increment = 0.008
+            self.success_hold_H = 60
+            self.progress_k = self.progress_min = self.progress_max = 0.0
+            # Strict tilt
+            self.slant_angle_min = 1.5
+            self.slant_penalty_min = -0.25
+            self.slant_penalty_max = -1.5
+            # Allow small slide
+            self.slide_threshold = 0.005   # was 0.003 (more lenient)
+            self.slide_penalty_min = -0.12
+            self.slide_penalty_max = -0.8
+            self.penalty_idle = 0.0
+            self._idle_grace_steps = 90    # longer grace to hold steady
+            self._update_markers()
+
+        elif self.phase == 1:
+            self.max_joint_increment = 0.012
+            self.success_hold_H = 100
+            self.progress_k = self.progress_min = self.progress_max = 0.0
+            self.slant_angle_min = 1.5
+            self.slant_penalty_min = -0.2
+            self.slant_penalty_max = -1.2
+            self.slide_threshold = 0.005
+            self.slide_penalty_min = -0.12
+            self.slide_penalty_max = -0.7
+            self.penalty_idle = 0.0
+            self._idle_grace_steps = 70
+            self._update_markers()
+
+        else:
+            # Phase 2+: restore config defaults already loaded
+            d = self._defaults
+            self.max_joint_increment = float(d["max_joint_increment"])
+            self.success_hold_H = int(d["success_hold_H"])
+            self.goal_tray_pos = d["goal_tray_pos"].copy()
+            self.goal_tray_rpy = d["goal_tray_rpy"].copy()
+            self.progress_k = float(d["progress_k"])
+            self.progress_min = float(d["progress_min"])
+            self.progress_max = float(d["progress_max"])
+            self.slant_angle_min = float(d["slant_angle_min"])
+            self.slant_penalty_min = float(d["slant_penalty_min"])
+            self.slant_penalty_max = float(d["slant_penalty_max"])
+            self.penalty_idle = float(d["penalty_idle"])
+            self._idle_grace_steps = 0
+            self._update_markers()
+        print(f"[phase] set to {self.phase}, goal_tray_pos={self.goal_tray_pos}, goal_yaw={self.goal_tray_rpy[2]:.3f}")
+
     @staticmethod
     def _wrap_angle(a):
         return (a + np.pi) % (2 * np.pi) - np.pi
@@ -246,21 +318,43 @@ class TrayPoseEnv(gym.Env):
     @staticmethod
     def interpolate(value, in_min, in_max, out_min, out_max, method='linear', exp_rate=5.0):
         """
-        Interpolates `value` from input range [in_min, in_max] to output range [out_min, out_max].
+        Map value in [in_min, in_max] -> [out_min, out_max].
+
+        Methods:
+        - 'linear': linear mapping.
+        - 'exponential': convex-up toward out_max (steeper near in_max).
+        - 'flip_exponential': convex-down from start (steeper near in_min).
+
+        Notes:
+        - exp_rate > 0 controls curvature. Larger = steeper.
+        - Handles reversed output ranges too (e.g., penalties out_min > out_max).
         """
-        import numpy as np
-        x = (value - in_min) / (in_max - in_min)
-        x = np.clip(x, 0, 1)
+        # Normalize to x in [0, 1]
+        if in_max == in_min:
+            x = 1.0 if value >= in_max else 0.0
+        else:
+            x = (value - in_min) / (in_max - in_min)
+            x = np.clip(x, 0.0, 1.0)
 
         if method == 'linear':
-            return out_min + x * (out_max - out_min)
+            y = x
+
         elif method == 'exponential':
-            if exp_rate == 0:
-                return out_min + x * (out_max - out_min)
-            exp_factor = (1 - np.exp(-exp_rate * x)) / (1 - np.exp(-exp_rate))
-            return out_min + exp_factor * (out_max - out_min)
+            # Steeper near x -> 1
+            # y = (1 - exp(-k x)) / (1 - exp(-k))
+            k = max(1e-8, float(exp_rate))
+            y = (1.0 - np.exp(-k * x)) / (1.0 - np.exp(-k))
+
+        elif method == 'flip_exponential':
+            # Steeper near x -> 0
+            # y = 1 - (1 - exp(-k (1-x))) / (1 - exp(-k))
+            k = max(1e-8, float(exp_rate))
+            y = 1.0 - (1.0 - np.exp(-k * (1.0 - x))) / (1.0 - np.exp(-k))
+
         else:
             raise ValueError(f"Unknown interpolation method: {method}")
+
+        return out_min + y * (out_max - out_min)
 
     def _update_markers(self):
         start_mocap_id = self.model.body_mocapid[self.start_marker_body_id]
@@ -268,6 +362,8 @@ class TrayPoseEnv(gym.Env):
 
         self.data.mocap_pos[start_mocap_id] = self.start_tray_pos
         self.data.mocap_pos[goal_mocap_id] = self.goal_tray_pos
+
+        mujoco.mj_forward(self.model, self.data)
 
     def _get_arm_qpos(self, noisy=False):
         q = np.array([self.data.qpos[addr] for addr in self.arm_qposadr], dtype=np.float64)
@@ -485,6 +581,13 @@ class TrayPoseEnv(gym.Env):
         # Unpack for rewards/termination
         cyl_pos_w, _ = self._get_cylinder_world_pos_vel()
 
+        terminated = False
+        truncated = False
+        is_success = False
+        drop_terminated = False
+        topple_terminated = False
+        cyl_angle = 0.0
+
         # Goal proximity
         yaw_err = self._wrap_angle(self.tray_yaw - self.goal_tray_rpy[2])
         pos_err = np.linalg.norm(self.tray_pos - self.goal_tray_pos)
@@ -499,10 +602,18 @@ class TrayPoseEnv(gym.Env):
         # Base time penalty every step
         reward = self.penalty_base
 
-        # Extra penalty if agent stays in place
+        # Extra penalty if agent stays in place (with phase-dependent grace)
+        phase = getattr(self, "phase", 2)
+        if self.phase in (0, 1):
+            self.penalty_idle = -0.0
+        else:
+            self.penalty_idle = float(self._defaults["penalty_idle"])
+
         action_mag = float(np.linalg.norm(action))
-        if action_mag <= 1e-3:
-            reward += self.penalty_idle
+        grace = getattr(self, "_idle_grace_steps", 0)
+        if self.t > grace:
+            if action_mag <= 1e-3:
+                reward += self.penalty_idle
 
         # --- Progress reward (distance-proportional, per-step) ---
         current_goal_dist = float(np.linalg.norm(self.tray_pos - self.goal_tray_pos))
@@ -529,7 +640,7 @@ class TrayPoseEnv(gym.Env):
                     distance,
                     self.slide_threshold, rim_diagonal,
                     self.slide_penalty_min, self.slide_penalty_max,
-                    method='linear', exp_rate=5.0
+                    method='exponential', exp_rate=5.0
                     )
             reward += sliding_penalty
 
@@ -539,13 +650,20 @@ class TrayPoseEnv(gym.Env):
         roll_abs = abs(self.tray_rpy[0])
         pitch_abs = abs(self.tray_rpy[1])
 
+        ## UPDATE REWARD FOR CURICULUM
+        if self.phase in (0, 1):
+            tilt_deg_now = np.rad2deg(max(roll_abs, pitch_abs))
+            if tilt_deg_now < 4.0:  # tight on tilt, ignores slide
+                level_scale = max(0.0, (4.0 - tilt_deg_now) / 4.0)
+                reward += 0.03 * level_scale
+                
         # Interpolate roll penalty
         if roll_abs >= slant_angle_min_rad:
             roll_penalty = self.interpolate(
                 roll_abs,
                 slant_angle_min_rad, slant_angle_max_rad,
                 self.slant_penalty_min, self.slant_penalty_max,
-                method='linear', exp_rate=5.0
+                method='flip_exponential', exp_rate=5.0
             )
             reward += roll_penalty
 
@@ -555,16 +673,22 @@ class TrayPoseEnv(gym.Env):
                 pitch_abs,
                 slant_angle_min_rad, slant_angle_max_rad,
                 self.slant_penalty_min, self.slant_penalty_max,
-                method='linear', exp_rate=5.0
+                method='flip_exponential', exp_rate=5.0
             )
             reward += pitch_penalty
 
-        terminated = False
-        truncated = False
-        is_success = False
-
-        drop_terminated = False
-        topple_terminated = False
+        ## UPDATE REWARD FOR CURICULUM
+        tilt_deg = np.rad2deg(max(roll_abs, pitch_abs))
+        self._tilt_band_count = getattr(self, "_tilt_band_count", 0)
+        if tilt_deg > 6.0:
+            self._tilt_band_count += 1
+        else:
+            self._tilt_band_count = 0
+        if not terminated and self.phase in (0, 1) and self._tilt_band_count >= 4:
+            reward += -0.6   # sharp penalty
+            terminated = True
+            topple_terminated = True
+            cyl_angle = np.deg2rad(tilt_deg)
 
         # Drop termination (large penalty)
         if cyl_pos_w[2] < (self.tray_pos[2] - self.drop_center_margin):
@@ -760,7 +884,7 @@ class TrayPoseEnv(gym.Env):
 
         joint_angles = self._get_arm_qpos(noisy=True)
         joint_velocities = self._get_arm_qvel(noisy=True)
-
+        
         goal_pose = np.concatenate([self.goal_tray_pos, np.array([self.goal_tray_rpy[2]])])
         tilt = np.array([cyl_angle, cyl_angle_rate]) 
 

@@ -264,7 +264,7 @@ def main():
 
     # I feel good ~~
     env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05, cylinder_noise_std_pos=0.005, cylinder_noise_std_vel=0.01, use_jacobian_tray_obs=True)
-
+    env.set_phase(2)
     # Print space info
     print_space_info(env)
 

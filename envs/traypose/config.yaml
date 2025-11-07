@@ -3,7 +3,7 @@ model_path: "assets/panda_tray/panda_tray_cylinder.xml"
 control:
   control_dt: 0.02
   substeps: 10
-  max_joint_increment: 0.04
+  max_joint_increment: 0.02
   tau_limits: [87, 87, 87, 87, 12, 12, 12]
 
 observation:
@@ -28,8 +28,10 @@ goal:
   max_steps: 500
 
 pd_gains:
-  Kq: [2000.0, 2000.0, 2000.0, 1500.0, 500.0, 400.0, 300.0]
-  Dq: [89.4427191, 89.4427191, 89.4427191, 77.45966692, 44.72135955, 40.0, 34.64101615]
+  Kq: [3000.0, 3000.0, 3000.0, 2250.0, 500.0, 400.0, 300.0]
+  Dq: [109.54451150103323, 109.54451150103323, 109.54451150103323, 94.86832980505137, 44.721359549995796, 40.0, 34.64101615137755]
+  # Kq: [2000.0, 2000.0, 2000.0, 1500.0, 500.0, 400.0, 300.0]
+  # Dq: [89.4427191, 89.4427191, 89.4427191, 77.45966692, 44.72135955, 40.0, 34.64101615]
 
 limits:
   joint_low:  [-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973]
@@ -44,10 +46,10 @@ penalties:
   slide_penalty_min: -0.1
   slide_penalty_max: -0.5
   slant_penalty_min: -0.1
-  slant_penalty_max: -0.5
-  progress_k: 20.0 
-  progress_min: 0.1
-  progress_max: 0.5
+  slant_penalty_max: -1.0
+  progress_k: 15.0 
+  progress_min: 0.05
+  progress_max: 0.2
 
 progress:
   min_delta: 5e-3
@@ -58,7 +60,7 @@ rim_zone:   # tray-frame half-lengths (positive values only)
   slide_threshold: 0.01
 
 slant_angle:
-  slant_angle_min: 5
+  slant_angle_min: 2
   slant_angle_max: 45
 
 

@@ -92,11 +92,15 @@ Perform training loop with Pytorch:
 
     python Network/Torch_train.py
 
-## 🧠 Training a model (SB3, no viewer render)
+## 🧠 Training a model (SB) with Stable Baseline 3 
 
-Perform training loop with Stable Baseline 3:
+Evaluate with TensorBoard:
 
-    python scripts/traypose/train_traypose.py
+    python scripts/traypose/train_traypose_tensorboard.py
+
+Evaluate with Weights & Biases (wandb):
+
+    python scripts/traypose/train_traypose_wandb.py
 
 
 ## 🧠 Testing a model (SB3, with viewer render)

@@ -1,0 +1,34 @@
+2025-11-05 23:01:23,699 INFO    MainThread:52636 [wandb_setup.py:_flush():81] Current SDK version is 0.22.3
+2025-11-05 23:01:23,699 INFO    MainThread:52636 [wandb_setup.py:_flush():81] Configure stats pid to 52636
+2025-11-05 23:01:23,699 INFO    MainThread:52636 [wandb_setup.py:_flush():81] Loading settings from /home/think/.config/wandb/settings
+2025-11-05 23:01:23,699 INFO    MainThread:52636 [wandb_setup.py:_flush():81] Loading settings from /home/think/ME5418/franka_tray_rl/wandb/settings
+2025-11-05 23:01:23,699 INFO    MainThread:52636 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2025-11-05 23:01:23,699 INFO    MainThread:52636 [wandb_init.py:setup_run_log_directory():706] Logging user logs to /home/think/ME5418/franka_tray_rl/wandb/run-20251105_230123-uq5aueu2/logs/debug.log
+2025-11-05 23:01:23,699 INFO    MainThread:52636 [wandb_init.py:setup_run_log_directory():707] Logging internal logs to /home/think/ME5418/franka_tray_rl/wandb/run-20251105_230123-uq5aueu2/logs/debug-internal.log
+2025-11-05 23:01:23,701 INFO    MainThread:52636 [wandb_init.py:init():833] calling init triggers
+2025-11-05 23:01:23,701 INFO    MainThread:52636 [wandb_init.py:init():838] wandb.init called with sweep_config: {}
+config: {'n_envs': 8, 'n_steps': 1024, 'batch_size': 256, 'total_timesteps': 1000000, 'learning_rate': 0.0001, 'gamma': 0.99, '_wandb': {'code_path': 'code/scripts/traypose/train_traypose.py'}}
+2025-11-05 23:01:23,701 INFO    MainThread:52636 [wandb_init.py:init():881] starting backend
+2025-11-05 23:01:23,923 INFO    MainThread:52636 [wandb_init.py:init():884] sending inform_init request
+2025-11-05 23:01:23,939 INFO    MainThread:52636 [wandb_init.py:init():892] backend started and connected
+2025-11-05 23:01:23,941 INFO    MainThread:52636 [wandb_init.py:init():962] updated telemetry
+2025-11-05 23:01:23,953 INFO    MainThread:52636 [wandb_init.py:init():986] communicating run to backend with 90.0 second timeout
+2025-11-05 23:01:24,883 WARNING MainThread:52636 [wandb_init.py:init():1588] [no run ID] interrupted
+Traceback (most recent call last):
+  File "/home/think/anaconda3/envs/franka_tray_rl/lib/python3.9/site-packages/wandb/sdk/wandb_init.py", line 1579, in init
+    run = wi.init(run_settings, run_config, run_printer)
+  File "/home/think/anaconda3/envs/franka_tray_rl/lib/python3.9/site-packages/wandb/sdk/wandb_init.py", line 997, in init
+    result = wait_with_progress(
+  File "/home/think/anaconda3/envs/franka_tray_rl/lib/python3.9/site-packages/wandb/sdk/mailbox/wait_with_progress.py", line 23, in wait_with_progress
+    return wait_all_with_progress(
+  File "/home/think/anaconda3/envs/franka_tray_rl/lib/python3.9/site-packages/wandb/sdk/mailbox/wait_with_progress.py", line 77, in wait_all_with_progress
+    return asyncer.run(progress_loop_with_timeout)
+  File "/home/think/anaconda3/envs/franka_tray_rl/lib/python3.9/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+  File "/home/think/anaconda3/envs/franka_tray_rl/lib/python3.9/concurrent/futures/_base.py", line 441, in result
+    self._condition.wait(timeout)
+  File "/home/think/anaconda3/envs/franka_tray_rl/lib/python3.9/threading.py", line 312, in wait
+    waiter.acquire()
+KeyboardInterrupt
+2025-11-05 23:01:24,898 INFO    wandb-AsyncioManager-main:52636 [service_client.py:_forward_responses():80] Reached EOF.
+2025-11-05 23:01:24,898 INFO    wandb-AsyncioManager-main:52636 [mailbox.py:close():137] Closing mailbox, abandoning 1 handles.

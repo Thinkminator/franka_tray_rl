@@ -11,7 +11,7 @@ os.chdir(PROJECT_ROOT)
 print("Working directory set to:", os.getcwd())
 
 # Load URDF directly with mujoco
-mj_model = mujoco.MjModel.from_xml_path("assets/panda_tray/panda_tray.urdf")
+mj_model = mujoco.MjModel.from_xml_path("assets/panda_tray/panda_tray_cylinder.urdf")
 data = mujoco.MjData(mj_model)
 
 # Launch viewer

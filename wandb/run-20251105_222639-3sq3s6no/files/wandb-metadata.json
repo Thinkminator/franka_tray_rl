@@ -1,0 +1,17 @@
+{
+  "os":  "Linux-6.8.0-86-generic-x86_64-with-glibc2.35",
+  "python":  "CPython 3.9.23",
+  "startedAt":  "2025-11-05T14:26:39.253783Z",
+  "program":  "/home/think/ME5418/franka_tray_rl/scripts/traypose/train_traypose.py",
+  "codePath":  "scripts/traypose/train_traypose.py",
+  "codePathLocal":  "scripts/traypose/train_traypose.py",
+  "git":  {
+    "remote":  "git@github.com:Thinkminator/franka_tray_rl.git",
+    "commit":  "6464a0785eff35d10763270a516da0db0aee2cae"
+  },
+  "email":  "thinkminator1024@gmail.com",
+  "root":  "/home/think/ME5418/franka_tray_rl",
+  "host":  "think-Legion-Pro-7-16IRX8H",
+  "executable":  "/home/think/anaconda3/envs/franka_tray_rl/bin/python",
+  "writerId":  "78gima01le286yqpy88hh02l7z7dj844"
+}

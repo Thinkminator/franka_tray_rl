@@ -88,7 +88,7 @@
                         <inertial pos="0 0 0" mass="0.001" diaginertia="1e-6 1e-6 1e-6"/>
                         
                         <body name="tray_base" pos="0 0 0" quat="1 0 0 0">
-                          <inertial pos="0 0 0" mass="0.5" diaginertia="0.002 0.0015 0.001"/>
+                          <inertial pos="0 0 0" mass="0.3" diaginertia="0.002 0.0015 0.001"/>
                           
                           <!-- Geoms now have no mass; dynamics come from tray_base inertial -->
                           <geom name="tray_base_geom" type="box" size="0.08 0.12 0.005" 
