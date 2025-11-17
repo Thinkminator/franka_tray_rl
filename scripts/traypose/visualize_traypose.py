@@ -30,9 +30,7 @@ def print_space_info(env):
     print(f"\nAction interpretation:")
     print(f"  - 7D vector (one per Panda joint)")
     print(f"  - Normalized range: [-1, 1]")
-    print(f"  - Maps to joint position increments")
-    print(f"  - Max increment per step: {env.max_joint_increment} rad")
-    print(f"  - Max speed: {env.max_joint_increment/env.control_dt:.2f} rad/s")
+    print(f"  - Maps to joint velocity commands (normalized), scaled by env.max_speed")
     
     print(f"\n{'='*60}")
     print("OBSERVATION SPACE")
@@ -43,18 +41,17 @@ def print_space_info(env):
     print(f"High bounds: {env.observation_space.high[:5]}... (showing first 5)")
     print(f"Dtype: {env.observation_space.dtype}")
     
-    print(f"\nObservation breakdown (34 dimensions):")
+    print(f"\nObservation breakdown (36 dimensions):")
     print(f"  [0:7] Joint angles (7D)")
     print(f"  [7:14] Joint velocities (7D)")
-    print(f"  [14:17]   Tray XYZ position (3D)")
-    print(f"  [17:20]   Tray roll, pitch, yaw (3D)")
-    print(f"  [20:23]  Tray linear velocity (3D)")
+    print(f"  [14:17] Tray XYZ position (3D)")
+    print(f"  [17:20] Tray roll, pitch, yaw (3D)")
+    print(f"  [20:23] Tray linear velocity (3D)")
     print(f"  [23:26] Tray angular velocity (3D)")
     print(f"  [26:30] Goal pose (XYZ + yaw, 4D)")
-    print(f"  [30:32]   Cylinder XY in tray frame (2D)")
+    print(f"  [30:32] Cylinder XY in tray frame (2D)")
     print(f"  [32:34] Cylinder velocity XY in tray frame (2D)")
-    print(f"  [34:35] Cylinder tilt angle in tray frame (1D)")
-    print(f"  [35:36] Cylinder tilt velocity in tray frame (1D)")
+    print(f"  [34:36] Cylinder tilt angle and velocity (2D)")
     print(f"{'='*60}\n")
 
 def print_observation_details(obs, step=0):
@@ -69,8 +66,7 @@ def print_observation_details(obs, step=0):
     print(f"Goal pose:           {obs[26:30]}")
     print(f"Cylinder XY (tray):  {obs[30:32]}")
     print(f"Cylinder vel XY:     {obs[32:34]}")
-    print(f"Cylinder angle (tray):  {obs[34:35]}")
-    print(f"Cylinder vel angle:     {obs[35:36]}")
+    print(f"Cylinder angle/vel:  {obs[34:36]}")
 
 def run_zero_action_mode(env, viewer, episode, pause_seconds=3.0):
     """Mode 1: Zero action - arm stays at start pose"""
@@ -83,7 +79,7 @@ def run_zero_action_mode(env, viewer, episode, pause_seconds=3.0):
     print_observation_details(obs, step=0)
     
     print(f"\nHolding start pose with zero actions for {pause_seconds}s...")
-    n_steps = int(pause_seconds / env.control_dt)
+    n_steps = int(pause_seconds / env.sim_dt)
     
     action = np.zeros(7, dtype=np.float32)
     print(f"Action (zero): {action}")
@@ -94,23 +90,26 @@ def run_zero_action_mode(env, viewer, episode, pause_seconds=3.0):
         done = terminated or truncated
         
         # Print status every second
-        if step % int(1.0 / env.control_dt) == 0:
-            cylinder_pos = env._get_cylinder_xyz()
+        if step % int(1.0 / env.sim_dt) == 0:
+            cylinder_pos, _ = env._get_cylinder_world_pos_vel()
             tray_pos = env.tray_pos
+            goal_pose = obs[26:30]
             cyl_xy_tray = obs[30:32]
             cyl_vel_tray = obs[32:34]
 
-            print(f"  t={step*env.control_dt:.1f}s | Reward: {reward:.3f}")
+
+            print(f"  t={step*env.sim_dt:.1f}s | Reward: {reward:.3f}")
             print(f"    Tray pos: {tray_pos}")
             print(f"    Cylinder world: {cylinder_pos}")
+            print(f"    Goal pose: {goal_pose}")
             print(f"    Cylinder XY (tray frame): {cyl_xy_tray}")
             print(f"    Cylinder vel XY (tray frame): {cyl_vel_tray}")
-            print(f"    Cylinder angle (tray): {obs[34:35]}")
-            print(f"    Cylinder vel angle: {obs[35:36]}")
-            print(f"    Terminated: {terminated}, Truncated: {truncated}, HoldCounter: {info.get('goal_hold_counter')}")
+            print(f"    Cylinder angle/vel (tray): {obs[34:36]}")
+            print(f"    Terminated: {terminated}, Truncated: {truncated}")
+            print(f"    Phase: {info.get('phase', 'N/A')}, Consecutive successes: {info.get('consecutive_successes', 0)}")
         
         viewer.sync()
-        time.sleep(env.control_dt)
+        time.sleep(env.sim_dt)
         
         if done or not viewer.is_running():
             if done:
@@ -122,109 +121,149 @@ def run_zero_action_mode(env, viewer, episode, pause_seconds=3.0):
     print_observation_details(obs, step=min(step+1, n_steps))
     print(f"Zero action mode completed after {min(step+1, n_steps)} steps")
 
-def run_random_action_mode(env, viewer, episode, max_steps=500):
-    """Mode 2: Random action - arm moves randomly within limits"""
-    print(f"\n=== Episode {episode+1} - RANDOM ACTION MODE ===")
+def run_random_changing_mode(env, viewer, episode, max_steps=500):
+    """Random-changing: sample a new random action each step (nondeterministic)"""
+    print(f"\n=== Episode {episode+1} - RANDOM CHANGING MODE ===")
     
-    # Reset env
     obs, _ = env.reset()
     print_observation_details(obs, step=0)
-    print(f"\nRunning random actions for up to {max_steps} steps...")
+    print(f"\nRunning changing random actions for up to {max_steps} steps...")
 
     step_count = 0
-    
     while step_count < max_steps and viewer.is_running():
-        # Sample random action in [-1, 1]
         action = np.random.uniform(-1.0, 1.0, size=7).astype(np.float32)
-        
-        # We keep moving even if terminated/truncated to observe free motion, but we log it.
         obs, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
 
         if step_count % 50 == 0:
-            cylinder_pos = env._get_cylinder_xyz()
+            cylinder_pos, _ = env._get_cylinder_world_pos_vel()
             tray_pos = env.tray_pos
-            cyl_xy_tray = obs[30:32]
-            cyl_vel_tray = obs[32:34]
-            tilt_angle = obs[34:35]
-            tilt_velocity = obs[35:36]
-            joint_pos = obs[0:7]
-            joint_vel = obs[7:14]
             print(f"\n  Step {step_count}")
             print(f"    Action: {action}")
             print(f"    Reward: {reward:.3f}")
             print(f"    Tray pos: {tray_pos}")
             print(f"    Cylinder world pos: {cylinder_pos}")
-            print(f"    Cylinder XY (tray frame): {cyl_xy_tray}")
-            print(f"    Cylinder vel XY (tray frame): {cyl_vel_tray}")
-            print(f"    Cylinder tilt angle: {tilt_angle}")
-            print(f"    Cylinder tilt velocity: {tilt_velocity}")
-            print(f"    Joint pos: {joint_pos}")    
-            print(f"    Joint vel: {joint_vel}")   
-            print(f"    Terminated: {terminated}, Truncated: {truncated}, HoldCounter: {info.get('goal_hold_counter')}")
-            print(f"    Obs shape: {obs.shape}, sample: {obs[:5]}...")
+            print(f"    Terminated: {terminated}, Truncated: {truncated}")
+            print(f"    Phase: {info.get('phase', 'N/A')}, Consecutive successes: {info.get('consecutive_successes', 0)}")
         
         viewer.sync()
         step_count += 1
-        time.sleep(env.control_dt)
+        time.sleep(env.sim_dt)
     
-    # Final check and observation
-    cylinder_pos = env._get_cylinder_xyz()
-    print(f"\nRandom action mode finished after {step_count} steps")
+    cylinder_pos, _ = env._get_cylinder_world_pos_vel()
+    print(f"\nRandom changing mode finished after {step_count} steps")
     print_observation_details(obs, step=step_count)
 
-def run_seeded_action_mode(env, viewer, episode, max_steps=500, seed=123):
-    """Mode 3: Seeded random actions - reproducible stochastic policy"""
-    print(f"\n=== Episode {episode+1} - SEEDED RANDOM MODE (seed={seed}) ===")
-    # Seed numpy for reproducible action sampling
-    np.random.seed(seed + episode)  # vary per-episode deterministically if desired
-
+def run_random_constant_mode(env, viewer, episode, max_steps=500):
+    """Random-constant: sample a single random action at start and hold it for the episode (nondeterministic)"""
+    print(f"\n=== Episode {episode+1} - RANDOM CONSTANT MODE ===")
+    
     obs, _ = env.reset()
     print_observation_details(obs, step=0)
-    print(f"\nRunning seeded-random actions for up to {max_steps} steps...")
+    print(f"\nSampling one random action and holding it for up to {max_steps} steps...")
+
+    action = np.random.uniform(-1.0, 1.0, size=7).astype(np.float32)
+    action = np.clip(action, -1.0, 1.0)
+    print(f"Constant action for episode: {action}")
 
     step_count = 0
     while step_count < max_steps and viewer.is_running():
-        # Deterministic (seeded) random action in [-1, 1]
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
+
+        if step_count % 50 == 0:
+            cylinder_pos, _ = env._get_cylinder_world_pos_vel()
+            tray_pos = env.tray_pos
+            print(f"\n  Step {step_count}")
+            print(f"    Held Action: {action}")
+            print(f"    Reward: {reward:.3f}")
+            print(f"    Tray pos: {tray_pos}")
+            print(f"    Cylinder world pos: {cylinder_pos}")
+            print(f"    Terminated: {terminated}, Truncated: {truncated}")
+        
+        viewer.sync()
+        step_count += 1
+        time.sleep(env.sim_dt)
+
+        if done:
+            break
+
+    print(f"\nRandom constant mode finished after {step_count} steps")
+    print_observation_details(obs, step=step_count)
+
+def run_seeded_changing_mode(env, viewer, episode, max_steps=500, seed=123):
+    """Seeded-changing: deterministic seeded random action sampled every step"""
+    print(f"\n=== Episode {episode+1} - SEEDED CHANGING MODE (seed={seed}) ===")
+    np.random.seed(seed + episode)  # deterministic per-episode
+
+    obs, _ = env.reset()
+    print_observation_details(obs, step=0)
+    print(f"\nRunning seeded changing actions for up to {max_steps} steps...")
+
+    step_count = 0
+    while step_count < max_steps and viewer.is_running():
         action = np.random.uniform(-1.0, 1.0, size=7).astype(np.float32)
-        # Explicitly clip to ensure bounds
         action = np.clip(action, -1.0, 1.0)
 
         obs, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
 
         if step_count % 50 == 0:
-            cylinder_pos = env._get_cylinder_xyz()
+            cylinder_pos, _ = env._get_cylinder_world_pos_vel()
             tray_pos = env.tray_pos
-            cyl_xy_tray = obs[30:32]
-            cyl_vel_tray = obs[32:34]
-            tilt_angle = obs[34:35]
-            tilt_velocity = obs[35:36]
-            joint_pos = obs[0:7]
-            joint_vel = obs[7:14]
             print(f"\n  Step {step_count}")
             print(f"    Action: {action}")
             print(f"    Reward: {reward:.3f}")
             print(f"    Tray pos: {tray_pos}")
             print(f"    Cylinder world pos: {cylinder_pos}")
-            print(f"    Cylinder XY (tray frame): {cyl_xy_tray}")
-            print(f"    Cylinder vel XY (tray frame): {cyl_vel_tray}")
-            print(f"    Cylinder tilt angle: {tilt_angle}")
-            print(f"    Cylinder tilt velocity: {tilt_velocity}")
-            print(f"    Joint pos: {joint_pos}")
-            print(f"    Joint vel: {joint_vel}")
-            print(f"    Terminated: {terminated}, Truncated: {truncated}, HoldCounter: {info.get('goal_hold_counter')}")
-            print(f"    Obs shape: {obs.shape}, sample: {obs[:5]}...")
-
+            print(f"    Terminated: {terminated}, Truncated: {truncated}")
+        
         viewer.sync()
         step_count += 1
-        time.sleep(env.control_dt)
+        time.sleep(env.sim_dt)
 
         if done:
-            # We still stop on env termination in this mode; change if you want free motion after done
             break
 
-    print(f"\nSeeded random mode finished after {step_count} steps")
+    print(f"\nSeeded changing mode finished after {step_count} steps")
+    print_observation_details(obs, step=step_count)
+
+def run_seeded_constant_mode(env, viewer, episode, max_steps=500, seed=123):
+    """Seeded-constant: deterministic seeded single random action sampled once and held"""
+    print(f"\n=== Episode {episode+1} - SEEDED CONSTANT MODE (seed={seed}) ===")
+    np.random.seed(seed + episode)  # deterministic per-episode
+
+    obs, _ = env.reset()
+    print_observation_details(obs, step=0)
+    print(f"\nSampling one seeded random action and holding it for up to {max_steps} steps...")
+
+    action = np.random.uniform(-1.0, 1.0, size=7).astype(np.float32)
+    action = np.clip(action, -1.0, 1.0)
+    print(f"Seeded constant action for episode: {action}")
+
+    step_count = 0
+    while step_count < max_steps and viewer.is_running():
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
+
+        if step_count % 50 == 0:
+            cylinder_pos, _ = env._get_cylinder_world_pos_vel()
+            tray_pos = env.tray_pos
+            print(f"\n  Step {step_count}")
+            print(f"    Held Seeded Action: {action}")
+            print(f"    Reward: {reward:.3f}")
+            print(f"    Tray pos: {tray_pos}")
+            print(f"    Cylinder world pos: {cylinder_pos}")
+            print(f"    Terminated: {terminated}, Truncated: {truncated}")
+        
+        viewer.sync()
+        step_count += 1
+        time.sleep(env.sim_dt)
+
+        if done:
+            break
+
+    print(f"\nSeeded constant mode finished after {step_count} steps")
     print_observation_details(obs, step=step_count)
 
 def main():
@@ -233,11 +272,20 @@ def main():
     if len(sys.argv) > 1:
         mode = sys.argv[1].lower()
     
-    if mode not in ["zero", "random", "seeded"]:
-        print("Usage: python visualize_traypose.py [zero|random|seeded]")
-        print("  zero    - Zero action mode (arm stays at start pose)")
-        print("  random  - Random action mode (arm moves randomly)")
-        print("  seeded  - Random actions with fixed RNG seed for reproducibility")
+    valid_modes = [
+        "zero",
+        "random_changing",
+        "random_constant",
+        "seeded_changing",
+        "seeded_constant"
+    ]
+    if mode not in valid_modes:
+        print("Usage: python visualize_traypose.py [zero|random_changing|random_constant|seeded_changing|seeded_constant]")
+        print("  zero             - Zero action mode (arm stays at start pose)")
+        print("  random_changing  - Random action each step (nondeterministic)")
+        print("  random_constant  - Single random action held for entire episode (nondeterministic)")
+        print("  seeded_changing  - Seeded random action each step (deterministic given seed)")
+        print("  seeded_constant  - Single seeded random action held for entire episode (deterministic given seed)")
         sys.exit(1)
     
     print(f"\n{'='*60}")
@@ -245,37 +293,23 @@ def main():
     print(f"{'='*60}")
     
     # Initialize environment with joint-space torque PD + gravity compensation
-    # env = TrayPoseEnv()
+    env = TrayPoseEnv(
+        obs_noise_std_pos=0.005, 
+        obs_noise_std_vel=0.05, 
+        cylinder_noise_std_pos=0.005, 
+        cylinder_noise_std_vel=0.01, 
+        use_jacobian_tray_obs=True
+    )
     
-    # Light noise (realistic sensor noise)
-    # env = TrayPoseEnv(obs_noise_std_pos=0.001, obs_noise_std_vel=0.01)  # ~0.06° pos, 0.57°/s vel
-
-    # Moderate noise
-    # env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05)  # ~0.29° pos, 2.86°/s vel
-
-    # Heavy noise (stress test)
-    # env = TrayPoseEnv(obs_noise_std_pos=0.01, obs_noise_std_vel=0.1)    # ~0.57° pos, 5.73°/s vel
-
-    # Noisy cylinder info
-    # env = TrayPoseEnv(config_path="envs/traypose/config.yaml", cylinder_noise_std_pos=0.005, cylinder_noise_std_vel=0.01)
-
-    # Jacobian FK with noisy joints → noisy tray obs
-    # env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05, use_jacobian_tray_obs=True)
-
-    # I feel good ~~
-    env = TrayPoseEnv(obs_noise_std_pos=0.005, obs_noise_std_vel=0.05, cylinder_noise_std_pos=0.005, cylinder_noise_std_vel=0.01, use_jacobian_tray_obs=True)
-    env.set_phase(2)
     # Print space info
     print_space_info(env)
-
-    print("\n🔧 Autotuning hold-pose gains...")
-    env.autotune_hold_pose(hold_seconds=2.0, max_pos_error_rad=0.01, verbose=True)
-    print("✓ Autotuning complete.\n")
         
     print(f"\nEnvironment settings:")
-    print(f"  Control dt: {env.control_dt}s ({1/env.control_dt:.0f} Hz)")
+    print(f"  Control dt: {env.sim_dt}s ({1/env.sim_dt:.0f} Hz)")
     print(f"  Substeps: {env.substeps}")
     print(f"  Observation noise: pos_std={env.obs_noise_std_pos:.4f} rad, vel_std={env.obs_noise_std_vel:.4f} rad/s")
+    print(f"  Curriculum phases: {env.num_phases}")
+    print(f"  Starting phase: {env.current_phase}")
     
     # Viewer
     with mujoco.viewer.launch_passive(env.model, env.data) as viewer:
@@ -284,10 +318,14 @@ def main():
         for episode in range(num_episodes):
             if mode == "zero":
                 run_zero_action_mode(env, viewer, episode, pause_seconds=10.0)
-            elif mode == "seeded":
-                run_seeded_action_mode(env, viewer, episode, max_steps=500, seed=123)
-            else:  # random
-                run_random_action_mode(env, viewer, episode, max_steps=500)
+            elif mode == "random_changing":
+                run_random_changing_mode(env, viewer, episode, max_steps=500)
+            elif mode == "random_constant":
+                run_random_constant_mode(env, viewer, episode, max_steps=500)
+            elif mode == "seeded_changing":
+                run_seeded_changing_mode(env, viewer, episode, max_steps=500, seed=123)
+            elif mode == "seeded_constant":
+                run_seeded_constant_mode(env, viewer, episode, max_steps=500, seed=123)
             
             # Pause between episodes
             if episode < num_episodes - 1:

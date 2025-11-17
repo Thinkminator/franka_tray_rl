@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
+"""
+Training script for TrayPose environment with curriculum learning.
+"""
+
 import os
 import sys
 import time
+import json
 import numpy as np
-import gymnasium as gym
-from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback, BaseCallback
-from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import VecNormalize
+from collections import deque
+import argparse
+from datetime import datetime
 
-# NOTE: To view logs during training, run in a separate terminal:
-# tensorboard --logdir training/logs
+import gymnasium as gym
+from stable_baselines3 import SAC, PPO
+from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.logger import TensorBoardOutputFormat
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.env_util import make_vec_env
 
 # Project root
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -23,99 +29,85 @@ if PROJECT_ROOT not in sys.path:
 from envs.traypose.traypose_env import TrayPoseEnv
 
 
-# ------------------- Zero-action warmup -------------------
-class ZeroActionFirstStepsWrapper(gym.Wrapper):
-    def __init__(self, env, zero_steps=10):
-        super().__init__(env)
-        self.zero_steps = zero_steps
-        self.current_step = 0
-
-    def reset(self, **kwargs):
-        self.current_step = 0
-        return self.env.reset(**kwargs)
-
-    def step(self, action):
-        if self.current_step < self.zero_steps:
-            zero_action = np.zeros_like(action)
-            obs, reward, terminated, truncated, info = self.env.step(zero_action)
-        else:
-            obs, reward, terminated, truncated, info = self.env.step(action)
-        self.current_step += 1
-        return obs, reward, terminated, truncated, info
-
-
-# ------------------- ENV Factory -------------------
-def make_env_fn(model_path="assets/panda_tray/panda_tray_cylinder.xml",
-                config_path="envs/traypose/config.yaml",
-                obs_noise_std_pos=0.0,
-                obs_noise_std_vel=0.0,
-                use_jacobian_tray_obs=False,
-                zero_steps=10,
-                tuned_Kq=None,
-                tuned_Dq=None,
-                start_phase=None):
-    def _thunk():
-        env = TrayPoseEnv(
-            model_path=model_path,
-            config_path=config_path,
-            obs_noise_std_pos=obs_noise_std_pos,
-            obs_noise_std_vel=obs_noise_std_vel,
-            use_jacobian_tray_obs=use_jacobian_tray_obs,
-        )
-        # Apply tuned gains if provided
-        if tuned_Kq is not None and tuned_Dq is not None:
-            env.Kq = tuned_Kq.copy()
-            env.Dq = tuned_Dq.copy()
-        # Optional: set initial curriculum phase for each env
-        if start_phase is not None and hasattr(env, "set_phase"):
-            env.set_phase(int(start_phase))
-        env = ZeroActionFirstStepsWrapper(env, zero_steps=zero_steps)
-        env = Monitor(env)
-        return env
-    return _thunk
-
-
-# ------------------- Helper for Resets -------------------
-def _reset_env(env):
-    res = env.reset()
-    if isinstance(res, tuple) and len(res) == 2:
-        obs, info = res
-    else:
-        obs = res
-        info = {}
-    return obs, info
-
-
-# ------------------- Custom Eval Callback (kept) -------------------
 class CustomEvalCallback(BaseCallback):
-    def __init__(self, eval_env, n_eval_episodes=30, eval_freq=5000,
-                 best_model_save_path=None, verbose=1, success_hold_H=None):
-        super().__init__(verbose)
+    """
+    Custom callback for evaluating the model and updating curriculum.
+    """
+    
+    def __init__(self, eval_env, eval_freq=1000, n_eval_episodes=10, verbose=1, 
+                 log_dir="./logs", max_episodes_without_progress=2000):
+        super(CustomEvalCallback, self).__init__(verbose)
         self.eval_env = eval_env
-        self.n_eval_episodes = n_eval_episodes
         self.eval_freq = eval_freq
-        self.best_mean_reward = -float("inf")
-        self.best_model_save_path = best_model_save_path
+        self.n_eval_episodes = n_eval_episodes
+        self.log_dir = log_dir
+        self.max_episodes_without_progress = max_episodes_without_progress
+        
+        # Tracking variables
         self._last_eval_step = 0
-        self.success_hold_H = success_hold_H
+        self.total_eval_episodes = 0
+        self.episode_rewards = deque(maxlen=100)
+        self.episode_lengths = deque(maxlen=100)
+        self.episode_successes = deque(maxlen=100)
+        self.episode_phases = deque(maxlen=100)
+        
+        # For early stopping if stuck in a phase
+        self.episodes_in_current_phase = 0
+        self.current_phase = 1
+        self.best_mean_reward = -np.inf
+        self.episodes_since_best_reward = 0
+        
+        # Setup TensorBoard logger
+        self.tb_logger = TensorBoardOutputFormat(log_dir)
+    
+    def _on_training_start(self) -> None:
+        """
+        This method is called before the first rollout starts.
+        """
+        pass
+
+    def _on_rollout_start(self) -> None:
+        """
+        A rollout is the collection of environment interaction
+        using the current policy.
+        This event is triggered before collecting new samples.
+        """
+        pass
 
     def _on_step(self) -> bool:
+        """
+        This method will be called by the model after each call to `env.step()`.
+        """
+        # Check if it's time to evaluate
         if (self.num_timesteps - self._last_eval_step) < self.eval_freq:
             return True
+        
         self._last_eval_step = self.num_timesteps
-
+        
+        # Evaluate the model
         rewards, lengths = [], []
         angles, offsets = [], []
         truncated_count = success_count = 0
         drop_terminated_count = topple_terminated_count = 0
+        phase_values = []
+        consecutive_successes_values = []
+        success_thresholds = []
 
         for _ in range(self.n_eval_episodes):
-            obs, info = _reset_env(self.eval_env)
+            reset_res = self.eval_env.reset()
+            if isinstance(reset_res, tuple) and len(reset_res) == 2:
+                obs, info = reset_res
+            else:
+                obs = reset_res
+                info = {}
             done = False
             ep_rew, ep_len = 0, 0
             ep_success = ep_truncated = False
             ep_drop_terminated = ep_topple_terminated = False
             angle = offset = 0
+            phase_val = 1
+            cons_successes = 0
+            success_thresh = 0
 
             while not done:
                 action, _ = self.model.predict(obs, deterministic=True)
@@ -139,11 +131,18 @@ class CustomEvalCallback(BaseCallback):
                     ep_topple_terminated = info.get("terminated_due_to_topple", False)
                     offset = info.get("cylinder_offset", 0)
                     angle = info.get("cylinder_angle", 0)
+                    phase_val = info.get("phase", 1)
+                    cons_successes = info.get("consecutive_successes", 0)
+                    success_thresh = info.get("success_threshold", 0)
 
             rewards.append(ep_rew)
             lengths.append(ep_len)
             angles.append(angle)
             offsets.append(offset)
+            phase_values.append(phase_val)
+            consecutive_successes_values.append(cons_successes)
+            success_thresholds.append(success_thresh)
+            
             if ep_truncated:
                 truncated_count += 1
             if ep_success:
@@ -153,203 +152,272 @@ class CustomEvalCallback(BaseCallback):
             if ep_topple_terminated:
                 topple_terminated_count += 1
 
+        self.total_eval_episodes += self.n_eval_episodes  # Increment total episodes evaluated
+
         total_eps = self.n_eval_episodes
         mean_reward = np.mean(rewards)
         mean_len = np.mean(lengths)
         mean_angle = np.mean(angles)
         mean_offset = np.mean(offsets)
+        mean_phase = np.mean(phase_values)
+        mean_consecutive_successes = np.mean(consecutive_successes_values)
+        mean_success_threshold = np.mean(success_thresholds)
 
-        if self.verbose:
+        # Update tracking variables
+        self.episode_rewards.append(mean_reward)
+        self.episode_lengths.append(mean_len)
+        self.episode_successes.append(success_count / total_eps)
+        self.episode_phases.append(mean_phase)
+        
+        # Print current phase information
+        print(f"[Eval] Current curriculum phase: {mean_phase:.1f} (Consecutive successes: {mean_consecutive_successes:.1f}/{mean_success_threshold:.1f})")
+        
+        # Track curriculum progress
+        if mean_phase > self.current_phase:
+            # Advanced to next phase
+            print(f"[Curriculum] Advanced from phase {self.current_phase} to phase {mean_phase:.1f}")
+            self.current_phase = mean_phase
+            self.episodes_in_current_phase = 0
+            self.episodes_since_best_reward = 0
+            self.best_mean_reward = mean_reward
+        else:
+            # Still in same phase
+            print(f"[Curriculum] Staying in phase {self.current_phase}")
+            self.episodes_in_current_phase += self.n_eval_episodes
+        
+        # Check if we've improved
+        if mean_reward > self.best_mean_reward:
+            self.best_mean_reward = mean_reward
+            self.episodes_since_best_reward = 0
+        else:
+            self.episodes_since_best_reward += self.n_eval_episodes
+        
+        # Early stopping logic
+        should_stop = False
+        if self.episodes_in_current_phase >= self.max_episodes_without_progress:
+            print(f"[EarlyStopping] Stopping training - exceeded {self.max_episodes_without_progress} episodes in phase {self.current_phase}")
+            should_stop = True
+        
+        if self.episodes_since_best_reward >= self.max_episodes_without_progress:
+            print(f"[EarlyStopping] Stopping training - no improvement in {self.max_episodes_without_progress} episodes")
+            should_stop = True
+
+        # Log to SB3 logger (which will write to TensorBoard)
+        self.logger.record("eval/mean_reward", mean_reward)
+        self.logger.record("eval/mean_ep_length", mean_len)
+        self.logger.record("eval/success_rate", success_count / total_eps)
+        self.logger.record("eval/drop_rate", drop_terminated_count / total_eps)
+        self.logger.record("eval/topple_rate", topple_terminated_count / total_eps)
+        self.logger.record("eval/truncated_rate", truncated_count / total_eps)
+        self.logger.record("eval/mean_cylinder_angle", mean_angle)
+        self.logger.record("eval/mean_cylinder_offset", mean_offset)
+        self.logger.record("curriculum/current_phase", mean_phase)
+        self.logger.record("curriculum/consecutive_successes", mean_consecutive_successes)
+        self.logger.record("curriculum/success_threshold", mean_success_threshold)
+        self.logger.record("episode/timesteps", self.num_timesteps)
+
+        # Flush the logger to write to TensorBoard
+        self.logger.dump(self.num_timesteps)
+
+        # Print only every 100 episodes
+        if self.verbose and (self.total_eval_episodes % 100 == 0):
             print(f"[CustomEval] step={self.num_timesteps} mean_reward={mean_reward:.3f} "
                   f"len={mean_len:.1f}, success%={100*success_count/total_eps:.2f}, "
                   f"drop%={100*drop_terminated_count/total_eps:.2f}, "
                   f"topple%={100*topple_terminated_count/total_eps:.2f}, "
-                  f"trunc%={100*truncated_count/total_eps:.2f}")
+                  f"trunc%={100*truncated_count/total_eps:.2f}, "
+                  f"phase={mean_phase:.1f}, cons_success={mean_consecutive_successes:.1f}")
 
-        # Record to SB3 logger (TensorBoard)
-        self.logger.record("custom_eval/mean_reward", mean_reward)
-        self.logger.record("custom_eval/success_rate", 100*success_count/total_eps)
-        self.logger.record("custom_eval/mean_ep_length", mean_len)
-        self.logger.record("custom_eval/mean_cylinder_angle", mean_angle)
-        self.logger.record("custom_eval/mean_cylinder_offset", mean_offset)
-        self.logger.record("custom_eval/truncated_pct", 100.0 * truncated_count / total_eps)
-        self.logger.record("custom_eval/drop_terminated_pct", 100.0 * drop_terminated_count / total_eps)
-        self.logger.record("custom_eval/topple_terminated_pct", 100.0 * topple_terminated_count / total_eps)
-        # ensure values are flushed to the logger
-        try:
-            self.logger.dump(self.num_timesteps)
-        except Exception:
-            pass
-        return True
+        return not should_stop
 
+    def _on_rollout_end(self) -> None:
+        """
+        This event is triggered before updating the policy.
+        """
+        pass
 
-# ------------------- Curriculum Learning -------------------
-def set_all_phase(venv, phase: int):
-    """Recursively set phase for all sub-environments, even through VecNormalize and Monitor wrappers."""
-    try:
-        if hasattr(venv, 'envs'):  # VecEnv container
-            for e in venv.envs:
-                if hasattr(e, 'set_phase'):
-                    e.set_phase(phase)
-                elif hasattr(e, 'env') and hasattr(e.env, 'set_phase'):
-                    e.env.set_phase(phase)
-        elif hasattr(venv, 'venv'):
-            set_all_phase(venv.venv, phase)
-        elif hasattr(venv, 'env'):
-            set_all_phase(venv.env, phase)
-    except Exception as ex:
-        print(f"[Curriculum] Warning: failed to set phase={phase} -> {ex}")
+    def _on_training_end(self) -> None:
+        """
+        This event is triggered before exiting the `learn()` method.
+        """
+        print("[Training] Training completed")
 
 
-class CurriculumCallback(BaseCallback):
-    """Switch curriculum phases during training and log phase to TensorBoard via SB3 logger."""
-    def __init__(self, eval_env, switch_steps=(200_000, 400_000), verbose=1):
-        super().__init__(verbose)
-        self.switch_steps = switch_steps
-        self.phase = 0
-        self.eval_env = eval_env
-
-    def _on_training_start(self):
-        set_all_phase(self.training_env, 0)
-        set_all_phase(self.eval_env, 0)
-        # Log initial phase to TensorBoard
-        self.logger.record("curriculum/phase", 0)
-        try:
-            self.logger.dump(self.num_timesteps)
-        except Exception:
-            pass
-        print("[Curriculum] Started in Phase 0 (balance only)")
-
-    def _on_step(self) -> bool:
-        gs = self.model.num_timesteps
-        if self.phase == 0 and gs >= self.switch_steps[0]:
-            self.phase = 1
-            set_all_phase(self.training_env, 1)
-            set_all_phase(self.eval_env, 1)
-            self.logger.record("curriculum/phase", 1)
-            try:
-                self.logger.dump(self.num_timesteps)
-            except Exception:
-                pass
-            print(f"[Curriculum] Moved to Phase 1 at {gs} steps")
-        elif self.phase == 1 and gs >= self.switch_steps[1]:
-            self.phase = 2
-            set_all_phase(self.training_env, 2)
-            set_all_phase(self.eval_env, 2)
-            self.logger.record("curriculum/phase", 2)
-            try:
-                self.logger.dump(self.num_timesteps)
-            except Exception:
-                pass
-            print(f"[Curriculum] Moved to Phase 2 at {gs} steps")
-        return True
+def make_env(config_path=None, seed=0):
+    def _init():
+        env = TrayPoseEnv(config_path=config_path)
+        # Initialize with seed for deterministic behavior
+        env.reset(seed=seed)
+        return env
+    return _init
 
 
-# ------------------- Main -------------------
-def main():
-    # TensorBoard logging is enabled via tensorboard_log below
-    # Create a project-local config dict and optionally record it to the SB3 logger
-    config = {
-        "n_envs": 8,
-        "n_steps": 1024,
-        "batch_size": 256,
-        "total_timesteps": 1_000_000,
-        "learning_rate": 1e-4,
-        "gamma": 0.99,
-    }
-
-    # 1) One-time PD autotune on a single temp env (optional but recommended)
-    temp_env = make_env_fn(
-        model_path="assets/panda_tray/panda_tray_cylinder.xml",
-        config_path="envs/traypose/config.yaml",
-        obs_noise_std_pos=0.0,
-        obs_noise_std_vel=0.0,
-        use_jacobian_tray_obs=False,
-        zero_steps=10,
-        tuned_Kq=None,
-        tuned_Dq=None,
-        start_phase=0,  # tune for Phase 0 balance
-    )()
-
-    # Unwrap: Monitor(ZeroActionFirstStepsWrapper(TrayPoseEnv))
-    base_env = temp_env
-    while hasattr(base_env, "env"):
-        base_env = base_env.env  # peel wrappers until reaching TrayPoseEnv
-
-    # Now base_env is TrayPoseEnv
-    if hasattr(base_env, "set_phase"):
-        base_env.set_phase(0)
-    base_env.reset()
-    Kq_new, Dq_new = base_env.autotune_hold_pose(hold_seconds=2.0, max_pos_error_rad=0.01, verbose=True)
-    tuned_Kq, tuned_Dq = Kq_new.copy(), Dq_new.copy()
-    temp_env.close()
-
-    # 2) Build env factory using tuned gains and starting in Phase 0
-    make_env = make_env_fn(
-        zero_steps=10,
-        tuned_Kq=tuned_Kq,
-        tuned_Dq=tuned_Dq,
-        start_phase=0
-    )
-
-    # Directories
-    log_dir = "training/logs"
-    save_dir = "training/checkpoints"
+def train_traypose(args):
+    """
+    Main training function for the TrayPose environment.
+    """
+    # Create log directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_dir = f"./training/logs/traypose_{timestamp}"
     os.makedirs(log_dir, exist_ok=True)
-    os.makedirs(save_dir, exist_ok=True)
-
-    n_envs = config["n_envs"]
-    total_timesteps = config["total_timesteps"]
-
-    # Vectorized envs
-    train_env = make_vec_env(make_env, n_envs=n_envs, monitor_dir=log_dir)
-    train_env = VecNormalize(train_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
-
-    eval_env = make_vec_env(make_env, n_envs=1, monitor_dir=log_dir)
-    eval_env = VecNormalize(eval_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
-
-    # Share VecNormalize stats
-    try:
-        eval_env.obs_rms = train_env.obs_rms
-    except Exception as e:
-        print("Warning: could not share obs_rms:", e)
-
-    model = PPO(
-        policy="MlpPolicy",
-        env=train_env,
+    
+    # Save arguments
+    with open(os.path.join(log_dir, "args.json"), "w") as f:
+        json.dump(vars(args), f, indent=2)
+    
+    print(f"[INFO] Starting training with log directory: {log_dir}")
+    
+    # Create environment with proper config and seed handling
+    print("[INFO] Creating environment...")
+    num_envs = 1  # Adjust for parallel environments if needed
+    env_fns = [make_env(args.config_path, seed=args.seed + i) for i in range(num_envs)]
+    env = DummyVecEnv(env_fns)
+    
+    if args.normalize:
+        print("[INFO] Normalizing environment observations...")
+        env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10.)
+    
+    # Create evaluation environment
+    eval_env = DummyVecEnv([make_env(args.config_path, seed=args.seed + 1000)])
+    if args.normalize:
+        eval_env = VecNormalize(eval_env, norm_obs=True, norm_reward=False, clip_obs=10.)
+    
+    # Create the model
+    print(f"[INFO] Creating {args.algorithm} model...")
+    if args.algorithm == "SAC":
+        model = SAC(
+            "MlpPolicy",
+            env,
+            verbose=1,
+            tensorboard_log=log_dir,
+            learning_rate=args.learning_rate,
+            buffer_size=args.buffer_size,
+            learning_starts=args.learning_starts,
+            batch_size=args.batch_size,
+            tau=args.tau,
+            gamma=args.gamma,
+            train_freq=1,
+            gradient_steps=1,
+            ent_coef="auto",
+            target_update_interval=1,
+            policy_kwargs=dict(net_arch=[256, 256])
+        )
+    elif args.algorithm == "PPO":
+        model = PPO(
+            "MlpPolicy",
+            env,
+            verbose=1,
+            tensorboard_log=log_dir,
+            learning_rate=args.learning_rate,
+            n_steps=args.n_steps,
+            batch_size=args.batch_size,
+            n_epochs=args.n_epochs,
+            gamma=args.gamma,
+            gae_lambda=args.gae_lambda,
+            clip_range=args.clip_range,
+            ent_coef=args.ent_coef,
+            vf_coef=args.vf_coef,
+            max_grad_norm=args.max_grad_norm,
+            policy_kwargs=dict(net_arch=[256, 256])
+        )
+    else:
+        raise ValueError(f"Unsupported algorithm: {args.algorithm}")
+    
+    # Create evaluation callback
+    eval_callback = CustomEvalCallback(
+        eval_env,
+        eval_freq=args.eval_freq,
+        n_eval_episodes=args.n_eval_episodes,
         verbose=1,
-        tensorboard_log=log_dir,  # SB3 will create logs here for TensorBoard
-        learning_rate=config["learning_rate"],
-        n_steps=1024,
-        batch_size=256,
-        gamma=0.99,
-        gae_lambda=0.95,
-        clip_range=0.2,
-        ent_coef=1e-3,
-        vf_coef=0.5,
-        n_epochs=10,
-        seed=42,
-        device="cpu",
+        log_dir=log_dir,
+        max_episodes_without_progress=args.max_episodes_without_progress
     )
-
-    eval_callback = EvalCallback(eval_env, best_model_save_path=save_dir,
-                                 log_path=log_dir, eval_freq=5_000,
-                                 deterministic=True, render=False, n_eval_episodes=10)
-
-    custom_eval_cb = CustomEvalCallback(eval_env=eval_env, eval_freq=5_000, verbose=1)
-    checkpoint_callback = CheckpointCallback(save_freq=50_000, save_path=save_dir, name_prefix="rl_model")
-    curriculum_callback = CurriculumCallback(eval_env=eval_env, switch_steps=(200_000, 400_000), verbose=1)
-
-    model.learn(
-        total_timesteps=total_timesteps,
-        callback=[eval_callback, custom_eval_cb, checkpoint_callback, curriculum_callback],
-    )
-
-    model.save(os.path.join(save_dir, "ppo_traypose_final"))
-    train_env.save(os.path.join(save_dir, "vecnormalize.pkl"))
-
-    print(f"Training complete. Models saved to {save_dir}")
+    
+    # Train the model
+    print("[INFO] Starting training...")
+    try:
+        model.learn(
+            total_timesteps=args.total_timesteps,
+            callback=eval_callback,
+            tb_log_name=args.algorithm
+        )
+    except KeyboardInterrupt:
+        print("[INFO] Training interrupted by user")
+    except Exception as e:
+        print(f"[ERROR] Training failed with exception: {e}")
+        raise
+    
+    # Save the model
+    model_path = os.path.join(log_dir, f"{args.algorithm}_final")
+    model.save(model_path)
+    if args.normalize:
+        env.save(os.path.join(log_dir, "vecnormalize_final.pkl"))
+    
+    print(f"[INFO] Model saved to {model_path}")
+    print("[INFO] Training completed")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Train TrayPose environment with curriculum learning")
+    
+    # Environment arguments
+    parser.add_argument("--config-path", type=str, default="config.yaml",
+                        help="Path to the environment configuration file")
+    
+    # Algorithm arguments
+    parser.add_argument("--algorithm", type=str, choices=["SAC", "PPO"], default="PPO",
+                        help="RL algorithm to use")
+    parser.add_argument("--total-timesteps", type=int, default=10000,
+                        help="Total number of training timesteps")
+    parser.add_argument("--learning-rate", type=float, default=3e-4,
+                        help="Learning rate")
+    
+    # SAC specific arguments
+    parser.add_argument("--buffer-size", type=int, default=10000,
+                        help="Replay buffer size")
+    parser.add_argument("--learning-starts", type=int, default=10000,
+                        help="How many steps to collect before training starts")
+    parser.add_argument("--batch-size", type=int, default=256,
+                        help="Batch size for training")
+    parser.add_argument("--tau", type=float, default=0.005,
+                        help="Target network update rate")
+    parser.add_argument("--gamma", type=float, default=0.99,
+                        help="Discount factor")
+    
+    # PPO specific arguments
+    parser.add_argument("--n-steps", type=int, default=2048,
+                        help="Number of steps to run for each environment per update")
+    parser.add_argument("--n-epochs", type=int, default=10,
+                        help="Number of epochs when optimizing the surrogate loss")
+    parser.add_argument("--gae-lambda", type=float, default=0.95,
+                        help="Factor for trade-off of bias vs variance for Generalized Advantage Estimator")
+    parser.add_argument("--clip-range", type=float, default=0.2,
+                        help="Clipping parameter")
+    parser.add_argument("--ent-coef", type=float, default=0.0,
+                        help="Entropy coefficient for the loss calculation")
+    parser.add_argument("--vf-coef", type=float, default=0.5,
+                        help="Value function coefficient for the loss calculation")
+    parser.add_argument("--max-grad-norm", type=float, default=0.5,
+                        help="The maximum value for the gradient clipping")
+    
+    # Training arguments
+    parser.add_argument("--normalize", action="store_true",
+                        help="Normalize observations and rewards")
+    parser.add_argument("--eval-freq", type=int, default=5000,
+                        help="Evaluate the model every N timesteps")
+    parser.add_argument("--n-eval-episodes", type=int, default=10,
+                        help="Number of episodes to evaluate")
+    parser.add_argument("--max-episodes-without-progress", type=int, default=2000,
+                        help="Maximum episodes to spend in a phase without progress before stopping")
+    
+    # Seed
+    parser.add_argument("--seed", type=int, default=0,
+                        help="Random seed")
+    
+    args = parser.parse_args()
+    
+    # Set random seeds
+    np.random.seed(args.seed)
+    
+    # Run training
+    train_traypose(args)

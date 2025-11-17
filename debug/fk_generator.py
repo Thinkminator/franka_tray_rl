@@ -14,10 +14,12 @@ print("Working directory set to:", os.getcwd())
 # -------------------------------
 # CONFIGURATION
 # -------------------------------
-MJCF_PATH = "assets/panda_tray/panda_tray_cylinder.xml"
+MJCF_PATH = "assets/panda_tray/world.xml"
 
 # Joint configuration to test (from your IK solution or any other config)
-test_joint_positions = np.array([0.41, 1.16, -0.79, -0.11, -0.73, 1.77, 0.42])
+# test_joint_positions = np.array([0.41, 1.16, -0.79, -0.11, -0.73, 1.77, 0.42])
+test_joint_positions = np.array([0.26, 0.82, 0.79, -0.44, 0.75, 2.03, -1.9])
+
 
 print(f"\nMuJoCo will load: {MJCF_PATH}")
 print(f"Test joint positions: {test_joint_positions}")

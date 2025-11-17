@@ -16,7 +16,7 @@ os.chdir(PROJECT_ROOT)
 print("Working directory set to:", os.getcwd())
 
 URDF_PATH = "assets/panda_tray/panda_tray.urdf"
-MJCF_PATH = "assets/panda_tray/panda_tray_cylinder.xml"
+MJCF_PATH = "assets/panda_tray/world.xml"
 
 # Panda joint limits (rad)
 JOINT_LIMITS_LOWER = [-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973]
@@ -150,7 +150,7 @@ def run_mujoco_with_ui(command_queue, status_queue):
     pb_joint_names = [f"panda_joint{i+1}" for i in range(7)]
     
     # State variables
-    tray_pos = [0.785, 0.107, 0.619]  # Reachable starting position
+    tray_pos = [0.150, -0.150, 0.450]  # Reachable starting position
     tray_yaw = 2.11
     joint_positions = [0.0] * 7
     
