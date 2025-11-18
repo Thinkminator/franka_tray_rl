@@ -11,7 +11,7 @@ control:
 
 debug:
   debug_prints: false
-  debug_interval_steps: 10
+  debug_interval_steps: 100
 
 limits:
   joint_high: [2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973]
@@ -42,17 +42,17 @@ observation:
 penalties: 
   base_step: -0.1
   drop: -10.0
-  idle_action: -0.4
-  slant_penalty_max: -1.0
+  idle_action: -0.1
+  slant_penalty_max: -0.5
   slant_penalty_min: -0.1
-  slide_penalty_max: -0.5
-  slide_penalty_min: -0.1
+  slide_penalty_max: -0.2
+  slide_penalty_min: -0.05
   topple: -5.0
 
 progress: 
-  min_delta: 5e-3
-  progress_k: 15.0
-  progress_max: 0.2
+  min_delta: 6e-5
+  max_delta: 1e-4
+  progress_max: 1.5
   progress_min: 0.05
 
 slant_angle:
@@ -76,3 +76,4 @@ curriculum:
   current_phase: 1
   phase_method: "linear"
   phase_exp_rate: 3.0
+  max_success_threshold: 10

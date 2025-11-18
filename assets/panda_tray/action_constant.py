@@ -14,7 +14,7 @@ Kd = np.array([50.0, 50.0, 50.0, 20.0, 20.0, 20.0, 10.0])
 n_joints = 7
 
 # initial qpos0 (kept as before)
-qpos0 = np.array([0.1, -1.24, 0.29, -2.3, 0.12, 2.68, -0.63], dtype=float)
+qpos0 = np.array([0.63, 0.17, 0.84, -1.01, -0.55, 2.68, -0.43], dtype=float)
 
 # max angular speed for denormalization (rad/s)
 max_speed = 0.3

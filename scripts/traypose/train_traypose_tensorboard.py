@@ -160,8 +160,11 @@ class CustomEvalCallback(BaseCallback):
         mean_angle = np.mean(angles)
         mean_offset = np.mean(offsets)
         mean_phase = np.mean(phase_values)
+        max_phase = np.max(phase_values)
         mean_consecutive_successes = np.mean(consecutive_successes_values)
+        max_consecutive_successes = np.max(consecutive_successes_values)
         mean_success_threshold = np.mean(success_thresholds)
+        max_success_threshold = np.max(success_thresholds)
 
         # Update tracking variables
         self.episode_rewards.append(mean_reward)
@@ -170,7 +173,7 @@ class CustomEvalCallback(BaseCallback):
         self.episode_phases.append(mean_phase)
         
         # Print current phase information
-        print(f"[Eval] Current curriculum phase: {mean_phase:.1f} (Consecutive successes: {mean_consecutive_successes:.1f}/{mean_success_threshold:.1f})")
+        print(f"[Eval] Current curriculum phase: {max_phase:.1f} (Consecutive successes: {mean_consecutive_successes:.1f}/{max_success_threshold:.1f})")
         
         # Track curriculum progress
         if mean_phase > self.current_phase:
@@ -211,9 +214,9 @@ class CustomEvalCallback(BaseCallback):
         self.logger.record("eval/truncated_rate", truncated_count / total_eps)
         self.logger.record("eval/mean_cylinder_angle", mean_angle)
         self.logger.record("eval/mean_cylinder_offset", mean_offset)
-        self.logger.record("curriculum/current_phase", mean_phase)
+        self.logger.record("curriculum/current_phase", max_phase)
         self.logger.record("curriculum/consecutive_successes", mean_consecutive_successes)
-        self.logger.record("curriculum/success_threshold", mean_success_threshold)
+        self.logger.record("curriculum/success_threshold", max_success_threshold)
         self.logger.record("episode/timesteps", self.num_timesteps)
 
         # Flush the logger to write to TensorBoard
@@ -226,7 +229,7 @@ class CustomEvalCallback(BaseCallback):
                   f"drop%={100*drop_terminated_count/total_eps:.2f}, "
                   f"topple%={100*topple_terminated_count/total_eps:.2f}, "
                   f"trunc%={100*truncated_count/total_eps:.2f}, "
-                  f"phase={mean_phase:.1f}, cons_success={mean_consecutive_successes:.1f}")
+                  f"phase={mean_phase:.1f}, max_cons_success={max_consecutive_successes:.1f}")
 
         return not should_stop
 
@@ -361,13 +364,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train TrayPose environment with curriculum learning")
     
     # Environment arguments
-    parser.add_argument("--config-path", type=str, default="config.yaml",
+    parser.add_argument("--config-path", type=str, default="envs/traypose/config.yaml",
                         help="Path to the environment configuration file")
     
     # Algorithm arguments
     parser.add_argument("--algorithm", type=str, choices=["SAC", "PPO"], default="PPO",
                         help="RL algorithm to use")
-    parser.add_argument("--total-timesteps", type=int, default=10000,
+    parser.add_argument("--total-timesteps", type=int, default=1000000,
                         help="Total number of training timesteps")
     parser.add_argument("--learning-rate", type=float, default=3e-4,
                         help="Learning rate")

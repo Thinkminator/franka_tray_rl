@@ -23,6 +23,7 @@ from envs.traypose.traypose_env import TrayPoseEnv
 def evaluate_model(model_path, num_episodes=3):
     # Create environment
     env = TrayPoseEnv(model_path="assets/panda_tray/world.xml")
+    env.set_phase(5)
     
     # Load trained model
     model = PPO.load(model_path, env=env)
@@ -68,6 +69,6 @@ def evaluate_model(model_path, num_episodes=3):
     print(f"\nAverage reward over {num_episodes} episodes: {avg_reward:.3f}")
 
 if __name__ == "__main__":
-    model_path = "training/logs/traypose_20251117_173626/PPO_final.zip"
+    model_path = "training/logs/traypose_20251118_172422/PPO_final.zip"
     # model_path = "checkpoints/best.pt"
     evaluate_model(model_path)

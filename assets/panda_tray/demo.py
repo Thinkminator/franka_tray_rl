@@ -16,7 +16,7 @@ except Exception:
 
 class Demo:
 
-    qpos0 = [0.41, 1.16, -0.79, -0.11, -0.73, 1.77, 0.42]
+    qpos0 = [0.63, 0.17, 0.84, -1.01, -0.55, 2.68, -0.43]
     height, width = 480, 640  # Rendering window resolution (used only for fallback).
     fps = 30  # Rendering framerate (fallback).
 

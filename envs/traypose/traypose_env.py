@@ -163,8 +163,8 @@ class TrayPoseEnv(gym.Env):
         self.slide_penalty_max = float(get("penalties.slide_penalty_max", -0.5))
         self.slant_penalty_min = float(get("penalties.slant_penalty_min", -0.1))
         self.slant_penalty_max = float(get("penalties.slant_penalty_max", -0.5))
-        self.progress_k = float(get("progress.progress_k", 5.0))
-        self.min_delta = float(get("progress.min_delta", 5e-3))
+        self.max_delta = float(get("progress.max_delta", 1e-4))
+        self.min_delta = float(get("progress.min_delta", 6e-5))
         self.progress_max = float(get("progress.progress_max", 0.5))
         self.progress_min = float(get("progress.progress_min", 0.1))
         self.success_alpha = float(get("success_reward.alpha", 50.0))
@@ -185,6 +185,7 @@ class TrayPoseEnv(gym.Env):
         self.phase_method = str(get("curriculum.phase_method", "linear"))
         self.phase_exp_rate = float(get("curriculum.phase_exp_rate", 3.0))
         self.consecutive_successes = 0
+        self.max_success_threshold = int(get("curriculum.max_success_threshold", 10))
 
         # Desired joint target and torque history
         self.q_des = self.start_joint_positions.copy()
@@ -221,12 +222,11 @@ class TrayPoseEnv(gym.Env):
         
         # Compute required consecutive successes per phase using flip exponential
         self.phase_success_thresholds = []
-        max_success_threshold = 50  # Maximum consecutive successes needed
         for i in range(self.num_phases):
             threshold = int(self.interpolate(
                 i, 0, self.num_phases - 1,
-                1, max_success_threshold,
-                method='flip_exponential', exp_rate=5.0
+                2, self.max_success_threshold,
+                method='linear', exp_rate=5.0
             ))
             self.phase_success_thresholds.append(threshold)
         
@@ -241,7 +241,7 @@ class TrayPoseEnv(gym.Env):
             success_hold_H=self.success_hold_H,
             goal_tray_pos=self.goal_tray_pos.copy(),
             goal_tray_rpy=self.goal_tray_rpy.copy(),
-            progress_k=self.progress_k,
+            max_delta=self.max_delta,
             progress_min=self.progress_min,
             progress_max=self.progress_max,
             slant_angle_min=self.slant_angle_min,
@@ -508,20 +508,34 @@ class TrayPoseEnv(gym.Env):
         reward = self.penalty_base
 
         action_mag = float(np.linalg.norm(self.last_action))
-        if not at_goal_now:
-            if action_mag <= 1e-4:
-                reward += self.penalty_idle
-        else:
-            reward += self.stay_reward
+        if self.debug_prints and (self.t % self.debug_print_interval == 0):
+            print(f"[DEBUG] Step {self.t}: action_mag  = {action_mag}")
 
+        if at_goal_now:
+            reward += self.stay_reward
+        else:
+            if action_mag <= 1e-5:
+                reward += self.penalty_idle
+                
         # --- Progress reward (distance-proportional, per-step) ---
         current_goal_dist = float(np.linalg.norm(self.tray_pos - self.current_goal_tray_pos))
         delta_goal = self.prev_goal_dist - current_goal_dist  # positive if closer
 
+        if self.debug_prints and (self.t % self.debug_print_interval == 0):
+            print(f"[DEBUG] Step {self.t}: delta_goal = {delta_goal}")
+
         if delta_goal > self.min_delta:
-            progress_reward = np.clip(self.progress_k * delta_goal, self.progress_min, self.progress_max)
+            progress_reward = self.interpolate(
+                    delta_goal,
+                    self.min_delta, self.max_delta,
+                    self.progress_min, self.progress_max,
+                    method='linear', exp_rate=5.0
+                    )
+            if self.debug_prints and (self.t % self.debug_print_interval == 0):
+                print(f"[DEBUG] Step {self.t}: progress_reward  = {progress_reward}")
             reward += progress_reward
 
+            
         # Update previous goal distance
         self.prev_goal_dist = current_goal_dist
 
@@ -618,6 +632,10 @@ class TrayPoseEnv(gym.Env):
             'consecutive_successes': consecutive_successes,
             'success_threshold': success_threshold
         }
+
+        # update curriculum once at episode end
+        if terminated or truncated:
+            self.update_curriculum(is_success)
         
         return reward, terminated, truncated, info
 
@@ -761,11 +779,12 @@ class TrayPoseEnv(gym.Env):
         Args:
             success (bool): Whether the episode was successful
         """
+        self.current_success_threshold = self.phase_success_thresholds[self.current_phase - 1]
         if success:
             self.consecutive_successes += 1
             # Check if we should advance to the next phase
             if (self.current_phase <= self.num_phases and 
-                self.consecutive_successes >= self.phase_success_thresholds[self.current_phase - 1]):
+                self.consecutive_successes >= self.current_success_threshold):
                 self.advance_phase()
         else:
             # Reset consecutive successes on failure
@@ -808,8 +827,17 @@ class TrayPoseEnv(gym.Env):
         # update goal position/orientation and markers
         self._update_phase_goal()
 
-        print(f"[LOG] set_phase -> {self.current_phase}/{self.num_phases}, "
-              f"goal_yaw_tolerance_deg={np.rad2deg(self.goal_yaw_tolerance):.1f}")
+        # expose current per-phase threshold for convenience/logging
+        try:
+            self.current_success_threshold = int(self.phase_success_thresholds[self.current_phase - 1])
+        except Exception:
+            self.current_success_threshold = None
+
+        print(f"[LOG] set_phase -> {self.current_phase}/{self.num_phases}")
+        print(f"[LOG] current_goal_tray_pos={self.current_goal_tray_pos}")
+        print(f"[LOG] current consecutive success threshold={self.current_success_threshold}")
+        print(f"[LOG] goal_yaw_tolerance_deg={np.rad2deg(self.goal_yaw_tolerance):.1f}")
+
 
     def _update_phase_goal(self):
         """Update the goal position based on the current phase."""
