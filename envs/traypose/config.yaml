@@ -29,8 +29,8 @@ goal:
   success_hold_steps: 5
   tray_pos: [0.151, 0.614, 0.958]
   tray_rpy: [0.0, 0.0, -1.918]
-  yaw_tolerance_deg: 5.0
-  relaxed_yaw_tolerance_deg: 360
+  yaw_tolerance_deg: 10.0
+  relaxed_yaw_tolerance_deg: 360.0
 
 observation: 
   cylinder_noise_std_pos: 0.0
@@ -41,13 +41,13 @@ observation:
 
 penalties: 
   base_step: -0.1
-  drop: -10.0
+  drop: -1000.0
   idle_action: -0.1
   slant_penalty_max: -0.5
   slant_penalty_min: -0.1
   slide_penalty_max: -0.2
   slide_penalty_min: -0.05
-  topple: -5.0
+  topple: -500.0
 
 progress: 
   min_delta: 6e-5
@@ -67,8 +67,8 @@ rim_zone:
 drop_check: {center_to_center_margin: 0.09}
 
 success_reward: 
-  alpha: 50.0
-  max_bonus: 50.0
+  min_bonus: 100
+  max_bonus: 1000.0
   stay_reward: 3.0
 
 curriculum:

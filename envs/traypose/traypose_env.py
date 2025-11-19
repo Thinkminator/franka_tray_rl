@@ -167,9 +167,10 @@ class TrayPoseEnv(gym.Env):
         self.min_delta = float(get("progress.min_delta", 6e-5))
         self.progress_max = float(get("progress.progress_max", 0.5))
         self.progress_min = float(get("progress.progress_min", 0.1))
-        self.success_alpha = float(get("success_reward.alpha", 50.0))
-        self.success_maxbonus = float(get("success_reward.max_bonus", 50.0))
-        self.stay_reward = float(get("success_reward.stay_reward", 3.0))
+        self.orig_success_minbonus = float(get("success_reward.min_bonus", 100.0))
+        self.orig_success_maxbonus = float(get("success_reward.max_bonus", 1000.0))
+        self.orig_stay_reward = float(get("success_reward.stay_reward", 3.0))
+        self.orig_surprise_reward = float(get("success_reward.surprise_reward", 500.0))
 
         # Zones and thresholds
         self.slant_angle_min = float(get("slant_angle.slant_angle_min", 2))
@@ -229,12 +230,35 @@ class TrayPoseEnv(gym.Env):
                 method='linear', exp_rate=5.0
             ))
             self.phase_success_thresholds.append(threshold)
+
+        self.stay_reward = []
+        for i in range(self.num_phases):
+            stay_reward = (i+1)*self.orig_stay_reward
+            self.stay_reward.append(stay_reward)
+
+        self.surprise_reward = []
+        for i in range(self.num_phases):
+            surprise_reward = (i+1)*self.orig_surprise_reward
+            self.surprise_reward.append(surprise_reward)
+
+        self.success_minbonus = []
+        for i in range(self.num_phases):
+            success_minbonus = (i+1)*self.orig_success_minbonus
+            self.success_minbonus.append(success_minbonus)
+        
+        self.success_maxbonus = []
+        for i in range(self.num_phases):
+            success_maxbonus = (i+1)*self.orig_success_maxbonus
+            self.success_maxbonus.append(success_maxbonus)
+
         
         # Set initial goal based on current phase
         self.current_goal_tray_pos = self.phase_boundaries[self.current_phase].copy()
         self.current_goal_tray_rpy = self.start_tray_rpy + (
             (self.current_phase / self.num_phases) * (self.goal_tray_rpy - self.start_tray_rpy)
         )
+
+
 
         # Defaults for curriculum restore
         self._defaults = dict(
@@ -512,7 +536,7 @@ class TrayPoseEnv(gym.Env):
             print(f"[DEBUG] Step {self.t}: action_mag  = {action_mag}")
 
         if at_goal_now:
-            reward += self.stay_reward
+            reward += self.stay_reward[self.current_phase-1]
         else:
             if action_mag <= 1e-5:
                 reward += self.penalty_idle
@@ -601,21 +625,28 @@ class TrayPoseEnv(gym.Env):
                 topple_terminated = True
                 cyl_angle = angle_from_upright
 
+        current_phase = self.current_phase
+        consecutive_successes = self.consecutive_successes
+        success_threshold = self.phase_success_thresholds[self.current_phase - 1] if self.current_phase <= self.num_phases else 0
+
         # Success check: if held goal for H steps, grant final positive reward
         if not terminated and self.goal_hold_counter >= self.success_hold_H:
             cyl_offset = np.linalg.norm(rel_cyl_xy_world)
-            final_bonus = max(0.0, self.success_maxbonus - self.success_alpha * cyl_offset)
+            final_bonus = self.interpolate(
+                cyl_offset,
+                rim_diagonal, 0,
+                self.success_minbonus[self.current_phase-1], self.success_maxbonus[self.current_phase-1],
+                method='linear', exp_rate=5.0
+            )
             reward += final_bonus
+            if consecutive_successes == success_threshold - 1:
+                reward += self.surprise_reward[self.current_phase - 1]
             is_success = True
             terminated = True  # task finishes successfully
 
         # Time limit truncation
         if not terminated and self.t >= self.max_steps:
             truncated = True
-        
-        current_phase = self.current_phase
-        consecutive_successes = self.consecutive_successes
-        success_threshold = self.phase_success_thresholds[self.current_phase - 1] if self.current_phase <= self.num_phases else 0
 
         info = {
             'goal_hold_counter': self.goal_hold_counter,
