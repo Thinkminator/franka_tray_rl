@@ -1,6 +1,6 @@
 # Franka Tray RL
 
-![alt text](image.png)
+
 <img width="542" height="375" alt="image" src="https://github.com/user-attachments/assets/87faaf8f-87f7-428c-8595-33bcd8a84af7" />
 
 This repository contains a custom MuJoCo + Gym environment for robotic manipulation with a Franka Panda arm, where the robot holds a tray and must balance/manipulate a cylinder for reinforcement learning research.
