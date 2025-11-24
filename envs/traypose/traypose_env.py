@@ -157,8 +157,8 @@ class TrayPoseEnv(gym.Env):
         # Penalties and rewards
         self.penalty_base = float(get("penalties.base_step", -0.1))
         self.penalty_idle = float(get("penalties.idle_action", -0.4))
-        self.penalty_drop = float(get("penalties.drop", -10.0))
-        self.penalty_topple = float(get("penalties.topple", -5.0))
+        self.orig_penalty_drop = float(get("penalties.drop", -10.0))
+        self.orig_penalty_topple = float(get("penalties.topple", -5.0))
         self.slide_penalty_min = float(get("penalties.slide_penalty_min", -0.1))
         self.slide_penalty_max = float(get("penalties.slide_penalty_max", -0.5))
         self.slant_penalty_min = float(get("penalties.slant_penalty_min", -0.1))
@@ -251,14 +251,21 @@ class TrayPoseEnv(gym.Env):
             success_maxbonus = (i+1)*self.orig_success_maxbonus
             self.success_maxbonus.append(success_maxbonus)
 
+        self.penalty_drop = []
+        for i in range(self.num_phases):
+            penalty_drop = (i+1)*self.orig_penalty_drop
+            self.penalty_drop.append(penalty_drop)
+
+        self.penalty_topple = []
+        for i in range(self.num_phases):
+            penalty_topple = (i+1)*self.orig_penalty_topple
+            self.penalty_topple.append(penalty_topple)
         
         # Set initial goal based on current phase
         self.current_goal_tray_pos = self.phase_boundaries[self.current_phase].copy()
         self.current_goal_tray_rpy = self.start_tray_rpy + (
             (self.current_phase / self.num_phases) * (self.goal_tray_rpy - self.start_tray_rpy)
         )
-
-
 
         # Defaults for curriculum restore
         self._defaults = dict(
@@ -609,7 +616,7 @@ class TrayPoseEnv(gym.Env):
 
         # Drop termination (large penalty)
         if cyl_pos_w[2] < (self.tray_pos[2] - self.drop_center_margin):
-            reward += self.penalty_drop
+            reward += self.penalty_drop[self.current_phase-1]
             terminated = True
             drop_terminated = True
 
@@ -620,7 +627,7 @@ class TrayPoseEnv(gym.Env):
             z_axis = cyl_rot.apply([0, 0, 1])
             angle_from_upright = np.arccos(np.clip(z_axis[2], -1.0, 1.0))
             if angle_from_upright > slant_angle_max_rad:  # > 45 deg from upright
-                reward += self.penalty_topple
+                reward += self.penalty_topple[self.current_phase-1]
                 terminated = True
                 topple_terminated = True
                 cyl_angle = angle_from_upright
@@ -816,6 +823,7 @@ class TrayPoseEnv(gym.Env):
             # Check if we should advance to the next phase
             if (self.current_phase <= self.num_phases and 
                 self.consecutive_successes >= self.current_success_threshold):
+                print(f"[LOG] End of phase: {self.current_phase}")
                 self.advance_phase()
         else:
             # Reset consecutive successes on failure
@@ -846,8 +854,6 @@ class TrayPoseEnv(gym.Env):
             phase = self.num_phases
 
         self.current_phase = phase
-        # keep the older 'phase' attribute in sync if used elsewhere
-        self.phase = phase
 
         # set yaw tolerance: relax for all but final phase
         if self.current_phase < self.num_phases:

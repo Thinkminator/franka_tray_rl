@@ -69,6 +69,6 @@ def evaluate_model(model_path, num_episodes=3):
     print(f"\nAverage reward over {num_episodes} episodes: {avg_reward:.3f}")
 
 if __name__ == "__main__":
-    model_path = "training/logs/traypose_20251119_215109/PPO_final.zip"
+    model_path = "training/logs/traypose_20251121_170137/PPO_best_phase_4.zip"
     # model_path = "checkpoints/best.pt"
     evaluate_model(model_path)

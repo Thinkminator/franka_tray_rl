@@ -300,6 +300,8 @@ def main():
         cylinder_noise_std_vel=0.01, 
         use_jacobian_tray_obs=True
     )
+
+    env.set_phase(5)
     
     # Print space info
     print_space_info(env)

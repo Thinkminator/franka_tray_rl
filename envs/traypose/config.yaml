@@ -26,7 +26,7 @@ start:
 goal:
   max_steps: 50000
   pos_tolerance: 0.03
-  success_hold_steps: 5
+  success_hold_steps: 100
   tray_pos: [0.151, 0.614, 0.958]
   tray_rpy: [0.0, 0.0, -1.918]
   yaw_tolerance_deg: 10.0
@@ -56,7 +56,7 @@ progress:
   progress_min: 0.05
 
 slant_angle:
-  slant_angle_max: 45
+  slant_angle_max: 20
   slant_angle_min: 2
 
 rim_zone: 
@@ -69,7 +69,7 @@ drop_check: {center_to_center_margin: 0.09}
 success_reward: 
   min_bonus: 100
   max_bonus: 1000.0
-  stay_reward: 3.0
+  stay_reward: 50.0
 
 curriculum:
   num_phases: 5

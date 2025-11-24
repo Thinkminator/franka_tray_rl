@@ -45,6 +45,7 @@ class CustomEvalCallback(BaseCallback):
         
         # Tracking variables
         self._last_eval_step = 0
+        self._last_saved_step = 0  # For checkpoint saving
         self.total_eval_episodes = 0
         self.episode_rewards = deque(maxlen=100)
         self.episode_lengths = deque(maxlen=100)
@@ -57,32 +58,83 @@ class CustomEvalCallback(BaseCallback):
         self.best_mean_reward = -np.inf
         self.episodes_since_best_reward = 0
         
+        # Track best reward per phase
+        self.best_reward_per_phase = {}
+        
         # Setup TensorBoard logger
         self.tb_logger = TensorBoardOutputFormat(log_dir)
-    
-    def _on_training_start(self) -> None:
-        """
-        This method is called before the first rollout starts.
-        """
-        pass
 
-    def _on_rollout_start(self) -> None:
+    def _sync_curriculum_phase(self):
         """
-        A rollout is the collection of environment interaction
-        using the current policy.
-        This event is triggered before collecting new samples.
+        Synchronize the evaluation environment's curriculum phase with the training environment.
+        Returns:
+            float: the training phase (or None on failure)
         """
-        pass
+        try:
+            if not hasattr(self.model, "env"):
+                return None
+
+            train_vec = self.model.env
+
+            # Try VecEnv.get_attr first (works for DummyVecEnv, SubprocVecEnv, VecNormalize)
+            try:
+                train_phases = train_vec.get_attr("current_phase")
+                train_phase = int(max(train_phases)) if train_phases else 1.0
+            except Exception:
+                # Fallback: unwrap to the first inner env
+                train_env_instance = train_vec
+                if hasattr(train_env_instance, "venv"):
+                    train_env_instance = train_env_instance.venv
+                if hasattr(train_env_instance, "envs") and len(train_env_instance.envs) > 0:
+                    train_env_instance = train_env_instance.envs[0]
+                train_phase = int(getattr(train_env_instance, "current_phase", 1.0))
+
+            # Set evaluation env(s) to this phase using VecEnv.set_attr if available
+            try:
+                self.eval_env.set_attr("current_phase", train_phase)
+            except Exception:
+                # Fallback: set directly on inner eval env(s)
+                if hasattr(self.eval_env, "envs"):
+                    for e in self.eval_env.envs:
+                        setattr(e, "current_phase", train_phase)
+                else:
+                    setattr(self.eval_env, "current_phase", train_phase)
+
+            print(f"[Eval] Evaluation environment phase synchronized to {train_phase}")
+            return train_phase
+
+        except Exception as e:
+            print(f"[Eval] Failed to sync phases: {e}")
+            return None
 
     def _on_step(self) -> bool:
         """
         This method will be called by the model after each call to `env.step()`.
         """
-        # Check if it's time to evaluate
+        # Check if it's time to evaluate, else skip this
         if (self.num_timesteps - self._last_eval_step) < self.eval_freq:
             return True
         
+        # Synchronize curriculum phases before evaluation
+        training_phase = self._sync_curriculum_phase()
+        if training_phase is None:
+            training_phase = 1.0  # safe default
+        
         self._last_eval_step = self.num_timesteps
+        
+        # Save model every 100,000 timesteps
+        if self.num_timesteps // 100000 > self._last_saved_step // 100000:
+            checkpoint_path = os.path.join(self.log_dir, f"{self.model.__class__.__name__}_checkpoint_{self.num_timesteps}")
+            self.model.save(checkpoint_path)
+            # If using VecNormalize, also save it
+            try:
+                if hasattr(self.model.get_env(), 'save'):
+                    norm_path = os.path.join(self.log_dir, f"vecnormalize_checkpoint_{self.num_timesteps}.pkl")
+                    self.model.get_env().save(norm_path)
+            except Exception:
+                pass  # Not all envs can be saved
+            print(f"[Checkpoint] Model saved at {self.num_timesteps} timesteps to {checkpoint_path}")
+            self._last_saved_step = self.num_timesteps
         
         # Evaluate the model
         rewards, lengths = [], []
@@ -94,7 +146,17 @@ class CustomEvalCallback(BaseCallback):
         success_thresholds = []
 
         for _ in range(self.n_eval_episodes):
+            try:
+                self.eval_env.set_attr("current_phase", training_phase)
+            except Exception:
+                if hasattr(self.eval_env, "envs"):
+                    for e in self.eval_env.envs:
+                        setattr(e, "current_phase", training_phase)
+                else:
+                    setattr(self.eval_env, "current_phase", training_phase)
+            
             reset_res = self.eval_env.reset()
+            
             if isinstance(reset_res, tuple) and len(reset_res) == 2:
                 obs, info = reset_res
             else:
@@ -160,11 +222,10 @@ class CustomEvalCallback(BaseCallback):
         mean_angle = np.mean(angles)
         mean_offset = np.mean(offsets)
         mean_phase = np.mean(phase_values)
-        max_phase = np.max(phase_values)
         mean_consecutive_successes = np.mean(consecutive_successes_values)
         max_consecutive_successes = np.max(consecutive_successes_values)
         mean_success_threshold = np.mean(success_thresholds)
-        max_success_threshold = np.max(success_thresholds)
+        min_success_threshold = np.min(success_thresholds)
 
         # Update tracking variables
         self.episode_rewards.append(mean_reward)
@@ -173,37 +234,7 @@ class CustomEvalCallback(BaseCallback):
         self.episode_phases.append(mean_phase)
         
         # Print current phase information
-        print(f"[Eval] Current curriculum phase: {max_phase:.1f} (Consecutive successes: {mean_consecutive_successes:.1f}/{max_success_threshold:.1f})")
-        
-        # Track curriculum progress
-        if mean_phase > self.current_phase:
-            # Advanced to next phase
-            print(f"[Curriculum] Advanced from phase {self.current_phase} to phase {mean_phase:.1f}")
-            self.current_phase = mean_phase
-            self.episodes_in_current_phase = 0
-            self.episodes_since_best_reward = 0
-            self.best_mean_reward = mean_reward
-        else:
-            # Still in same phase
-            print(f"[Curriculum] Staying in phase {self.current_phase}")
-            self.episodes_in_current_phase += self.n_eval_episodes
-        
-        # Check if we've improved
-        if mean_reward > self.best_mean_reward:
-            self.best_mean_reward = mean_reward
-            self.episodes_since_best_reward = 0
-        else:
-            self.episodes_since_best_reward += self.n_eval_episodes
-        
-        # Early stopping logic
-        should_stop = False
-        if self.episodes_in_current_phase >= self.max_episodes_without_progress:
-            print(f"[EarlyStopping] Stopping training - exceeded {self.max_episodes_without_progress} episodes in phase {self.current_phase}")
-            should_stop = True
-        
-        if self.episodes_since_best_reward >= self.max_episodes_without_progress:
-            print(f"[EarlyStopping] Stopping training - no improvement in {self.max_episodes_without_progress} episodes")
-            should_stop = True
+        print(f"[Eval] Current curriculum phase: {training_phase} (Consecutive successes: {mean_consecutive_successes}/{min_success_threshold})")
 
         # Log to SB3 logger (which will write to TensorBoard)
         self.logger.record("eval/mean_reward", mean_reward)
@@ -214,9 +245,9 @@ class CustomEvalCallback(BaseCallback):
         self.logger.record("eval/truncated_rate", truncated_count / total_eps)
         self.logger.record("eval/mean_cylinder_angle", mean_angle)
         self.logger.record("eval/mean_cylinder_offset", mean_offset)
-        self.logger.record("curriculum/current_phase", max_phase)
+        self.logger.record("curriculum/mean_phase", mean_phase)
         self.logger.record("curriculum/consecutive_successes", mean_consecutive_successes)
-        self.logger.record("curriculum/success_threshold", max_success_threshold)
+        self.logger.record("curriculum/success_threshold", mean_success_threshold)
         self.logger.record("episode/timesteps", self.num_timesteps)
 
         # Flush the logger to write to TensorBoard
@@ -224,26 +255,22 @@ class CustomEvalCallback(BaseCallback):
 
         # Print only every 100 episodes
         if self.verbose and (self.total_eval_episodes % 100 == 0):
-            print(f"[CustomEval] step={self.num_timesteps} mean_reward={mean_reward:.3f} "
+            print(f"[Eval] step={self.num_timesteps} Current start phase: {training_phase} mean_reward={mean_reward:.3f} "
                   f"len={mean_len:.1f}, success%={100*success_count/total_eps:.2f}, "
                   f"drop%={100*drop_terminated_count/total_eps:.2f}, "
                   f"topple%={100*topple_terminated_count/total_eps:.2f}, "
                   f"trunc%={100*truncated_count/total_eps:.2f}, "
                   f"phase={mean_phase:.1f}, max_cons_success={max_consecutive_successes:.1f}")
 
-        return not should_stop
+        # Save best model for each phase
+        current_phase_int = int(training_phase)
+        if current_phase_int not in self.best_reward_per_phase or mean_reward > self.best_reward_per_phase[current_phase_int]:
+            self.best_reward_per_phase[current_phase_int] = mean_reward
+            best_model_path = os.path.join(self.log_dir, f"{self.model.__class__.__name__}_best_phase_{current_phase_int}")
+            self.model.save(best_model_path)
+            print(f"[Eval] New best model for phase {current_phase_int} saved with reward {mean_reward:.3f}")
 
-    def _on_rollout_end(self) -> None:
-        """
-        This event is triggered before updating the policy.
-        """
-        pass
-
-    def _on_training_end(self) -> None:
-        """
-        This event is triggered before exiting the `learn()` method.
-        """
-        print("[Training] Training completed")
+        return True
 
 
 def make_env(config_path=None, seed=0):
@@ -275,6 +302,20 @@ def train_traypose(args):
     num_envs = 1  # Adjust for parallel environments if needed
     env_fns = [make_env(args.config_path, seed=args.seed + i) for i in range(num_envs)]
     env = DummyVecEnv(env_fns)
+    
+    # === ADD THIS: Set training env to start at phase 5 ===
+    try:
+        env.set_attr("current_phase", 5)
+        print("[INFO] Set training environment to start at phase 5")
+    except Exception as e:
+        # Fallback: set directly on inner envs
+        for i, inner_env in enumerate(env.envs):
+            try:
+                setattr(inner_env, "current_phase", 5)
+                print(f"[INFO] Set training sub-environment {i} to phase 5")
+            except Exception as inner_e:
+                print(f"[WARNING] Could not set phase for sub-env {i}: {inner_e}")
+    # =====================================================
     
     if args.normalize:
         print("[INFO] Normalizing environment observations...")
@@ -384,7 +425,7 @@ if __name__ == "__main__":
                         help="Batch size for training")
     parser.add_argument("--tau", type=float, default=0.005,
                         help="Target network update rate")
-    parser.add_argument("--gamma", type=float, default=0.99,
+    parser.add_argument("--gamma", type=float, default=0.9995,
                         help="Discount factor")
     
     # PPO specific arguments

@@ -9,14 +9,15 @@ This repository contains a custom MuJoCo + Gym environment for robotic manipulat
     │
     ├── assets/                     # Models & meshes
     │   ├── panda_tray/             # Panda + tray assets
-    │   │   ├── hand.stl
-    │   │   ├── link0.stl ... link7.stl   # Panda STL meshes
+    │   │   ├── mesh
+    │   │   ├── testure
     │   │   ├── panda_tray.urdf     # URDF definition of Panda + Tray
-    │   │   ├── panda_tray_cylinder.xml # MJCF (MuJoCo) with tray + cylinder
-    |   │   ├── panda_tray_cylinder_camera.xml
-    |   │   └── panda_tray_cylinder_torque.xml
-    │   ├── panda/
-    │   └── tray/ 
+    │   │   ├── panda.xml # MJCF (MuJoCo) of robot
+    |       ├── world.xml # MJCF (MuJoCo) of floor, robot, cylinder and markers
+    |       ├── position_PID.py # python script of moving each joint
+    |       ├── demo.py # python script of fix arm at a pose
+    |       ├── action_constant.py  # python script for zero, seeded, random action (same value)
+    |       └── action_changing.py  # python script for zero, seeded, random action (changing value)
     │
     ├── debug/                      # Standalone debugging scripts
     │   ├── check_urdf_xml.py       # Check whether urdf and xml is the same - essential for using URDF with pybullet to get IK solutions for XML
@@ -29,8 +30,9 @@ This repository contains a custom MuJoCo + Gym environment for robotic manipulat
     ├── docs/  
     │   └── TrayPose.md             # Explain TrayPose environment
     |
+    ├── matlab/
+    ├── Network 
     ├── envs/                       # OpenAI Gym environments
-    │   ├── torquesensor/           # (Future: Replace cylinder state with noisy torque sensor readings on both horizontal axes [2])
     │   └── traypose/               # Main tray manipulation environment
     │       ├── __init__.py
     │       ├── config.yaml         # Config file (parameters)
@@ -39,11 +41,9 @@ This repository contains a custom MuJoCo + Gym environment for robotic manipulat
     ├── jointpos/                   # Placeholder for joint position values to define start & goal pose
     │   └── config.txt              # Tested start and goal position info
     ├── scripts/                    # Runnable scripts
-    │   ├── torquesensor/
     │   └── traypose/
-    |       ├── pd_tuning.py            # Grid search for PD parameters
     |       ├── test_trainpose.py       # Test train models
-    |       ├── train_traypose.py       # Train models
+    |       ├── train_traypose_tensorboard.py       # Train models
     │       └── visualize_traypose.py   # Demo script with MuJoCo viewer
     │
     └── training/                   # Folder for RL training data
@@ -73,55 +73,57 @@ Visualize the tray-cylinder environment:
 
 - [Mode] = zero, seeded or random 
     - zero: Zero action mode (arm stays at start pose)
-    - random: Random action mode (arm moves randomly)
-    - seeded: Random actions with fixed RNG seed for reproducibility
+    - random_changing: Random and changing action mode (arm moves randomly)
+    - random_constant: Random but same action mode (arm moves randomly)
+    - seeded_constant: Same random actions with fixed RNG seed for reproducibility
+    - seeded_changing: Changing random actions with fixed RNG seed for reproducibility
 
 A MuJoCo viewer will open showing the Panda arm holding the tray.
 A red cylinder will spawn above the tray.
 Random actions will move the tray.
 
-## 🧠 Running a Network model (No viewer render)
+## 🧠 Solve with Reinforcement Learning
+### Running a Network model (No viewer render)
 
 To see a forward and backward pass with network update:
 
     python Network/Net_demo.py
     
-## 🧠 Training a model(Pytorch based, no viewer render)
+### Training a model(Pytorch based, no viewer render)
 
 Perform training loop with Pytorch:
 
     python Network/Torch_train.py
 
-## 🧠 Training a model (SB) with Stable Baseline 3 
+### Training a model (SB) with Stable Baseline 3 
 
 Evaluate with TensorBoard:
+Save the model every 100000 steps at phase 5:
 
     python scripts/traypose/train_traypose_tensorboard.py
+
+Save the model from phase 1, each phase saves 1 model:
+
+    python scripts/traypose/train_traypose_tensorboard_each.py
 
 To see the training evaluation:
 
     tensorboard --logdir training/logs
 
-Evaluate with Weights & Biases (wandb):
 
-    python scripts/traypose/train_traypose_wandb.py
-
-
-
-
-## 🧠 Testing a model (SB3, with viewer render)
+### Testing a model (SB3, with viewer render)
 
 To evaluate a model:
 
     python scripts/traypose/test_trainpose.py
 
+To change the phase, just modify the env.set_phase([phase]), which [phase] will be 1-5.
 
-## 🧠 Next Steps (RL Training)
+## 🛠️ Solve with STOMP
+1. Launch MATLAB and open the matlab folder
+2. Open the [panda_tray_STOMP_Path_Planning.mlx](matlab/panda_tray_STOMP_Path_Planning.mlx) and press "Run"
 
-Tuning of the hyperparameter and reward structure to ensure valid training 
 
-
-📌 TODO roadmap
-- Add torque-sensor env
-- Release pre-trained models
-- [Future] Integrate RGB-D camera inputs (depthcamera env) to track cylinder
+## 🔍 Result Viewing
+1. The tensorboard graphs are stored in [tensorboard_graph](tensorboard_graph).
+2. The recordings of RL models and STOMP performances are kept at [videos](videos).
